@@ -1,3 +1,4 @@
+/* FILE: xlsx-lite.js  (GitHub par isi naam se upload karein) */
 /*
  * A2Z Build Tech - tiny Excel reader/writer (no libraries)
  *   A2ZXlsx.read(arrayBuffer)  -> Promise of rows (array of arrays of strings), first sheet
@@ -60,27 +61,46 @@
     return out;
   }
 
-  function write(rows, sheetName, widths) {
-    var name = xmlEsc(String(sheetName || 'Sheet1').replace(/[\[\]:*?\/\\]/g, ' ').slice(0, 31) || 'Sheet1');
+  function sheetName(n, i, used) {
+    var base = String(n || 'Sheet' + (i + 1)).replace(/[\[\]:*?\/\\]/g, ' ').trim().slice(0, 31) || 'Sheet' + (i + 1), k = base, c = 2;
+    while (used[k.toLowerCase()]) { k = base.slice(0, 28) + ' ' + c++; }
+    used[k.toLowerCase()] = 1; return k;
+  }
+  function sheetXml(rows, widths) {
     var cols = '';
     if (widths && widths.length) cols = '<cols>' + widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join('') + '</cols>';
     var data = rows.map(function (r, ri) {
       return '<row r="' + (ri + 1) + '">' + r.map(function (v, ci) {
         if (v === null || v === undefined || v === '') return '';
-        return '<c r="' + colName(ci) + (ri + 1) + '" t="inlineStr"' + (ri === 0 ? ' s="1"' : '') + '><is><t xml:space="preserve">' + xmlEsc(v) + '</t></is></c>';
+        var ref = colName(ci) + (ri + 1);
+        if (typeof v === 'number' && isFinite(v)) return '<c r="' + ref + '"' + (ri === 0 ? ' s="1"' : '') + '><v>' + v + '</v></c>';
+        return '<c r="' + ref + '" t="inlineStr"' + (ri === 0 ? ' s="1"' : '') + '><is><t xml:space="preserve">' + xmlEsc(v) + '</t></is></c>';
       }).join('') + '</row>';
     }).join('');
-    var X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols + '<sheetData>' + data + '</sheetData></worksheet>';
+  }
+  /* sheets: [{ name, rows, widths }] -> ek workbook, kai sheet. Number ko number hi rakhta hai (Excel me jod ho sake). */
+  function writeBook(sheets) {
+    var X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n', used = {}, names = sheets.map(function (sh, i) { return sheetName(sh.name, i, used); });
+    var ct = '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+    var wbSheets = '', rels = '';
+    sheets.forEach(function (sh, i) {
+      ct += '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+      wbSheets += '<sheet name="' + xmlEsc(names[i]) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+      rels += '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+    });
+    rels += '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
     var files = [
-      { name: '[Content_Types].xml', data: enc(X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>') },
+      { name: '[Content_Types].xml', data: enc(X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' + ct + '</Types>') },
       { name: '_rels/.rels', data: enc(X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>') },
-      { name: 'xl/workbook.xml', data: enc(X + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="' + name + '" sheetId="1" r:id="rId1"/></sheets></workbook>') },
-      { name: 'xl/_rels/workbook.xml.rels', data: enc(X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>') },
-      { name: 'xl/styles.xml', data: enc(X + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>') },
-      { name: 'xl/worksheets/sheet1.xml', data: enc(X + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols + '<sheetData>' + data + '</sheetData></worksheet>') }
+      { name: 'xl/workbook.xml', data: enc(X + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + wbSheets + '</sheets></workbook>') },
+      { name: 'xl/_rels/workbook.xml.rels', data: enc(X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>') },
+      { name: 'xl/styles.xml', data: enc(X + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>') }
     ];
+    sheets.forEach(function (sh, i) { files.push({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', data: enc(sheetXml(sh.rows, sh.widths)) }); });
     return zipStore(files);
   }
+  function write(rows, name, widths) { return writeBook([{ name: name, rows: rows, widths: widths }]); }
 
   /* ---------- read ---------- */
   async function inflateRaw(bytes) {
@@ -191,5 +211,5 @@
     return new Date(Math.round((n - 25569) * 86400000)).toISOString().slice(0, 10);
   }
 
-  return { read: read, write: write, parseDelimited: parseDelimited, excelDate: excelDate, crc32: crc32 };
+  return { read: read, write: write, writeBook: writeBook, parseDelimited: parseDelimited, excelDate: excelDate, crc32: crc32 };
 });

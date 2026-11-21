@@ -1,3 +1,4 @@
+/* FILE: app.js  (GitHub par isi naam se upload karein) */
 /* A2Z Build Tech - page logic. Calculations live in calc.js, content and storage rules in data.js. */
 (function(){
 'use strict';

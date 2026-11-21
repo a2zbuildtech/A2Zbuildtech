@@ -1,3 +1,4 @@
+/* FILE: data.js  (GitHub par isi naam se upload karein) */
 /*
  * A2Z Build Tech - content and stored data
  * Default rates, methods, formulas, terms, and the sanitiser that cleans

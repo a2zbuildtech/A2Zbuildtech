@@ -1,3 +1,4 @@
+/* FILE: portal.css  (GitHub par isi naam se upload karein) */
 /* A2Z Build Tech portal: admin console and staff link. No inline styles are used (see the server's CSP). */
 :root{
   --bg:#f2f3f0; --sf:#ffffff; --fg:#14202b; --mu:#566370; --ln:#d3d8d4; --soft:#e7eae6;
@@ -71,5 +72,17 @@ tr.err td{background:var(--warnbg)}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:5px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;max-width:calc(100% - 28px)}
 #toast.on{opacity:1}
 .pre{white-space:pre-wrap;font:13px var(--fm);background:var(--soft);padding:10px;border-radius:4px}
+/* hazri grid */
+.hzT{width:auto;min-width:100%}
+.hzT th.hzh{padding:3px 1px;text-align:center}
+.hzd{font:700 11px var(--fb);background:none;border:0;color:var(--mu);cursor:pointer;padding:4px 3px;min-width:24px}
+.hzd:hover{color:var(--fg);text-decoration:underline}
+.hzt{padding:2px 1px;text-align:center}
+.hzn{white-space:nowrap;font-weight:600}
+.hz{font:700 12px var(--fb);width:26px;height:28px;border:1px solid var(--ln);border-radius:4px;background:var(--bg);color:var(--mu);cursor:pointer;padding:0}
+.hz.hzp{background:var(--ok);color:var(--bg);border-color:var(--ok)}
+.hz.hzh{background:var(--warn);color:var(--bg);border-color:var(--warn)}
+.hzc{text-align:center;font-size:12px;font-weight:700}
+.td{background:var(--soft)}
 @media print{header.top,nav.tabs,.noprint,#toast{display:none!important}body{background:#fff;color:#000}.card,.sheet{border:1px solid #999}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}

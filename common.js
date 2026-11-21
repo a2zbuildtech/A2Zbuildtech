@@ -1,3 +1,4 @@
+/* FILE: common.js  (GitHub par isi naam se upload karein) */
 /* Shared helpers for the admin console and the staff page */
 (function () {
   'use strict';

@@ -1,3 +1,4 @@
+/* FILE: calc.js  (GitHub par isi naam se upload karein) */
 /*
  * A2Z Build Tech - calculation engine
  * Pure functions only: no page access, so every number can be tested in Node.

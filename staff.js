@@ -1,3 +1,4 @@
+/* FILE: staff.js  (GitHub par isi naam se upload karein) */
 /* A2Z Build Tech - staff page: Excel-like entry sheet and own statement.
    The link is  /staff#<token>. The token stays in the address fragment, which browsers never send to servers. */
 (function () {
