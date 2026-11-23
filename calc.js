@@ -102,6 +102,101 @@
       } }
   ];
 
+
+  /* ---- mechanical division: nine calculators (same shape as the civil ones) ---- */
+  var STEEL_KG = 7.85;          // kg per m2 per mm of mild steel plate
+  var KG_MM = 0.00785;          // kg per metre per mm2 of mild steel
+  var BEAMS = [['ISMB 100', 11.5], ['ISMB 125', 13], ['ISMB 150', 14.9], ['ISMB 175', 19.3], ['ISMB 200', 25.4], ['ISMB 225', 31.2], ['ISMB 250', 37.3], ['ISMB 300', 44.2], ['ISMB 350', 52.4], ['ISMB 400', 61.6],
+    ['ISMC 75', 6.8], ['ISMC 100', 9.2], ['ISMC 125', 12.7], ['ISMC 150', 16.4], ['ISMC 175', 19.1], ['ISMC 200', 22.1], ['ISMC 250', 30.4], ['ISMC 300', 35.8]];
+  var MOTORS = [0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3, 3.7, 5.5, 7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200];
+  var SHAPES = [['round', 'Round bar (size A = diameter)'], ['flat', 'Flat bar (A = width, T = thickness)'], ['angle', 'Angle (A and B = legs, T)'], ['tube', 'Square or rectangular tube (A, B, T)']];
+
+  function shapeKgPerM(kind, a, b, t) {
+    if (kind === 'round') return a * a / 162;
+    if (kind === 'flat') return a * t * KG_MM;
+    if (kind === 'angle') return Math.max(0, a + b - t) * t * KG_MM;
+    return Math.max(0, 2 * (a + (b || a) - 2 * t)) * t * KG_MM;
+  }
+
+  var MCALCS = [
+    { id: 'plate', n: 'Steel plate', hi: 'प्लेट वज़न', f: [
+        { k: 'l', l: 'Length', u: 'm', d: 2.5 }, { k: 'b', l: 'Width', u: 'm', d: 1.25 }, { k: 't', l: 'Thickness', u: 'mm', d: 10 },
+        { k: 'q', l: 'Number of plates', d: 4 }, { k: 'w', l: 'Cutting scrap and wastage', u: '%', d: 8 }],
+      run: function (v, rate) {
+        var one = n(v.l) * n(v.b) * n(v.t) * STEEL_KG, tot = one * Math.max(1, n(v.q));
+        return [L(rate, 'Area of one plate', n(v.l) * n(v.b), 'm²'), L(rate, 'Weight of one plate', one, 'kg'), L(rate, 'Net weight', tot, 'kg'),
+          L(rate, 'Steel to buy (with wastage)', tot * (1 + pct(v.w) / 100), 'kg', 'm_steel')];
+      } },
+    { id: 'bars', n: 'Bars, angles, tubes', hi: 'सरिया एंगल ट्यूब', f: [
+        { k: 'kind', l: 'Shape', o: SHAPES, d: 'angle' },
+        { k: 'a', l: 'Size A', u: 'mm', d: 50 }, { k: 'b', l: 'Size B (angle, rectangular tube)', u: 'mm', d: 50 }, { k: 't', l: 'Thickness T', u: 'mm', d: 6 },
+        { k: 'len', l: 'Length of one piece', u: 'm', d: 6 }, { k: 'q', l: 'Number of pieces', d: 10 }, { k: 'w', l: 'Wastage', u: '%', d: 5 }],
+      run: function (v, rate) {
+        var kind = pick(v.kind, SHAPES.map(function (x) { return x[0]; }), 'angle'), kgm = shapeKgPerM(kind, n(v.a), n(v.b), n(v.t)), tl = n(v.len) * Math.max(1, n(v.q));
+        return [L(rate, 'Weight per metre', kgm, 'kg/m'), L(rate, 'Total length', tl, 'm'), L(rate, 'Net weight', kgm * tl, 'kg'),
+          L(rate, 'Steel to buy (with wastage)', kgm * tl * (1 + pct(v.w) / 100), 'kg', kind === 'round' ? 'm_round' : 'm_steel')];
+      } },
+    { id: 'beam', n: 'Beam and channel', hi: 'बीम चैनल', f: [
+        { k: 's', l: 'Section (IS 808)', o: BEAMS.map(function (x) { return [x[0], x[0] + ' (' + x[1] + ' kg/m)']; }), d: 'ISMB 200' },
+        { k: 'len', l: 'Length of one piece', u: 'm', d: 6 }, { k: 'q', l: 'Number of pieces', d: 8 }, { k: 'w', l: 'Wastage', u: '%', d: 3 }],
+      run: function (v, rate) {
+        var sec = BEAMS.filter(function (x) { return x[0] === String(v.s); })[0] || BEAMS[4], tl = n(v.len) * Math.max(1, n(v.q)), kg = sec[1] * tl;
+        return [L(rate, 'Weight per metre (table value)', sec[1], 'kg/m'), L(rate, 'Total length', tl, 'm'), L(rate, 'Net weight', kg, 'kg'),
+          L(rate, 'Steel to buy (with wastage)', kg * (1 + pct(v.w) / 100), 'kg', 'm_steel')];
+      } },
+    { id: 'pipe', n: 'Pipe', hi: 'पाइप', f: [
+        { k: 'od', l: 'Outer diameter (OD)', u: 'mm', d: 114.3 }, { k: 't', l: 'Wall thickness', u: 'mm', d: 4.5 }, { k: 'len', l: 'Total length', u: 'm', d: 60 },
+        { k: 'vel', l: 'Flow velocity (for flow rate)', u: 'm/s', d: 2 }],
+      run: function (v, rate) {
+        var od = n(v.od), t = Math.min(n(v.t), od / 2), id = Math.max(0, od - 2 * t), kgm = (od - t) * t * 0.02466, len = n(v.len);
+        return [L(rate, 'Weight per metre', kgm, 'kg/m'), L(rate, 'Pipe weight', kgm * len, 'kg', 'm_pipe'),
+          L(rate, 'Inside diameter', id, 'mm'), L(rate, 'Outer surface area (paint or insulation)', Math.PI * od / 1000 * len, 'm²'),
+          L(rate, 'Water held in the line', Math.PI / 4 * Math.pow(id / 1000, 2) * len * 1000, 'litre'),
+          L(rate, 'Flow at this velocity', 0.002827 * id * id * n(v.vel), 'm³/h')];
+      } },
+    { id: 'weld', n: 'Welding', hi: 'वेल्डिंग', f: [
+        { k: 'kind', l: 'Weld type', o: [['fillet', 'Fillet weld (size = leg)'], ['butt', 'Single-V butt weld (size = plate thickness)']], d: 'fillet' },
+        { k: 's', l: 'Size', u: 'mm', d: 6 }, { k: 'len', l: 'Total weld length', u: 'm', d: 120 }, { k: 'eff', l: 'Electrode deposition efficiency', u: '%', d: 60 }],
+      run: function (v, rate) {
+        var s = n(v.s), kind = pick(v.kind, ['fillet', 'butt'], 'fillet'), eff = Math.max(30, Math.min(95, pct(v.eff) || 60));
+        var area = kind === 'fillet' ? 0.5 * s * s : (2 * s + s * s * Math.tan(Math.PI / 6));   // mm2, root gap 2 mm for the butt weld
+        var kg = area * n(v.len) * KG_MM * 1.1;                                                  // plus 10 percent reinforcement
+        return [L(rate, 'Weld area', area, 'mm²'), L(rate, 'Weld metal (with 10% reinforcement)', kg, 'kg'),
+          L(rate, 'Electrodes needed', kg / (eff / 100), 'kg', 'm_elec')];
+      } },
+    { id: 'paint', n: 'Steel painting', hi: 'पेंटिंग', f: [
+        { k: 'a', l: 'Surface area', u: 'm²', d: 200 }, { k: 'dft', l: 'Total dry film thickness', u: 'µm', d: 120 },
+        { k: 'vs', l: 'Volume solids of paint', u: '%', d: 60 }, { k: 'loss', l: 'Loss and wastage', u: '%', d: 30 }],
+      run: function (v, rate) {
+        var lit = n(v.a) * n(v.dft) / (10 * Math.max(10, Math.min(100, pct(v.vs) || 60)));
+        return [L(rate, 'Surface area', n(v.a), 'm²'), L(rate, 'Blasting and surface preparation', n(v.a), 'm²', 'm_blast'),
+          L(rate, 'Paint, theoretical', lit, 'litre'), L(rate, 'Primer or paint to buy (with loss)', lit * (1 + pct(v.loss, 200) / 100), 'litre', 'm_primer', true)];
+      } },
+    { id: 'fab', n: 'Fabrication job cost', hi: 'फैब्रिकेशन खर्च', f: [
+        { k: 'kg', l: 'Finished steel weight', u: 'kg', d: 5000 }, { k: 'w', l: 'Scrap and wastage', u: '%', d: 7 }],
+      run: function (v, rate) {
+        var kg = n(v.kg);
+        return [L(rate, 'Finished weight', kg, 'kg'), L(rate, 'Steel to buy (with scrap)', kg * (1 + pct(v.w) / 100), 'kg', 'm_steel'),
+          L(rate, 'Fabrication labour', kg, 'kg', 'm_fablab'), L(rate, 'Blasting and painting', kg, 'kg', 'm_paintkg'),
+          L(rate, 'Electrodes (about 1.5% of the weight)', kg * 0.015, 'kg', 'm_elec')];
+      } },
+    { id: 'pump', n: 'Pump and motor', hi: 'पंप मोटर', f: [
+        { k: 'q', l: 'Flow', u: 'm³/h', d: 60 }, { k: 'h', l: 'Total head', u: 'm', d: 30 }, { k: 'sg', l: 'Specific gravity of liquid', d: 1 }, { k: 'eff', l: 'Pump efficiency', u: '%', d: 65 }],
+      run: function (v) {
+        var eff = Math.max(10, Math.min(95, pct(v.eff) || 65)), sg = n(v.sg) || 1, kw = n(v.q) * n(v.h) * sg / (367 * eff / 100), need = kw * 1.15;
+        var mot = MOTORS.filter(function (m) { return m >= need; })[0] || Math.ceil(need);
+        return [L(null, 'Shaft power needed', kw, 'kW'), L(null, 'With 15% margin', need, 'kW'), L(null, 'Standard motor to choose', mot, 'kW'), L(null, 'Same in horsepower', mot * 1.341, 'HP')];
+      } },
+    { id: 'drive', n: 'Torque and speed', hi: 'टॉर्क व स्पीड', f: [
+        { k: 'kw', l: 'Motor power', u: 'kW', d: 7.5 }, { k: 'rpm', l: 'Motor speed', u: 'rpm', d: 1440 },
+        { k: 'd1', l: 'Driver pulley or gear size', u: 'mm or teeth', d: 100 }, { k: 'd2', l: 'Driven pulley or gear size', u: 'mm or teeth', d: 300 }],
+      run: function (v) {
+        var rpm = Math.max(1, n(v.rpm)), d2 = Math.max(1, n(v.d2)), out = rpm * n(v.d1) / d2, t1 = 9550 * n(v.kw) / rpm;
+        return [L(null, 'Torque on motor shaft', t1, 'N·m'), L(null, 'Driven shaft speed', out, 'rpm'), L(null, 'Speed ratio (reduction)', d2 / Math.max(1, n(v.d1)), ':1'),
+          L(null, 'Torque on driven shaft (no losses)', t1 * d2 / Math.max(1, n(v.d1)), 'N·m')];
+      } }
+  ];
+
   /* material cost + labour and margin */
   function totals(rows, labPct) {
     var mat = 0;
@@ -184,7 +279,7 @@
   }
 
   return {
-    BAG: BAG, MIX: MIX, MORT: MORT, BARS: BARS, CALCS: CALCS,
+    BAG: BAG, MIX: MIX, MORT: MORT, BARS: BARS, CALCS: CALCS, MCALCS: MCALCS, BEAMS: BEAMS,
     n: n, pct: pct, ceilSafe: ceilSafe, esc: esc,
     totals: totals, boqTotals: boqTotals, mpTotals: mpTotals, billNet: billNet,
     agreementText: agreementText, dateText: dateText

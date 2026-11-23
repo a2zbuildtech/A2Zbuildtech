@@ -83,3 +83,6 @@ pre.doc{white-space:pre-wrap;word-break:break-word;font:13.5px/1.6 var(--fm);bac
 #toast.on{opacity:1}
 footer{border-top:1px solid var(--ln);background:var(--sf);padding-block:20px;color:var(--mu);font-size:13px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+
+.logo{width:46px;height:46px;display:block;flex:none}
+.brand{align-items:center}

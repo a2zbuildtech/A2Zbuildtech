@@ -71,6 +71,74 @@
     C.download(A2ZXlsx.write(rows, sheet, widths), name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   };
 
+    /* ---------- photo: file -> chhoti JPEG (dataURL). Server ko 400KB se badi nahi chahiye ---------- */
+  C.photoFromFile = function (file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type)) { reject(new Error('Sirf photo (image) chunein')); return; }
+      var fr = new FileReader();
+      fr.onerror = function () { reject(new Error('Photo padh nahi pai')); };
+      fr.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('Ye photo khul nahi rahi. Dusri photo chunein.')); };
+        img.onload = function () {
+          var max = 480, k = Math.min(1, max / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
+          var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+          var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(img, 0, 0, w, h);
+          var q = 0.82, out = cv.toDataURL('image/jpeg', q);
+          while (out.length > 260000 && q > 0.3) { q -= 0.1; out = cv.toDataURL('image/jpeg', q); }
+          resolve(out);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  };
+
+  /* ---------- ID card (PNG): staff ya candidate. o = {kind, serial, name, role, mobile, lines:[..], photo, joined} ---------- */
+  C.idCard = function (o) {
+    return new Promise(function (resolve) {
+      var W = 760, H = 480, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      var x = cv.getContext('2d'), staff = o.kind === 'staff';
+      x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+      x.fillStyle = staff ? '#14365c' : '#1f5d3a'; x.fillRect(0, 0, W, 92);
+      x.fillStyle = '#ffffff'; x.font = '800 34px Arial, sans-serif'; x.fillText('A2Z BUILD TECH', 28, 50);
+      x.font = '15px Arial, sans-serif'; x.fillText('All Type Manpower Supplier  |  ' + (staff ? 'STAFF ID CARD' : 'WORKER ID CARD'), 28, 76);
+      x.fillStyle = '#e8eef5'; x.fillRect(28, 120, 220, 270); x.strokeStyle = '#9aa7b5'; x.lineWidth = 2; x.strokeRect(28, 120, 220, 270);
+      function text() {
+        x.fillStyle = '#111'; x.textBaseline = 'alphabetic';
+        x.font = '700 30px Arial, sans-serif'; x.fillText(String(o.name || '').slice(0, 26), 275, 150);
+        x.font = '18px Arial, sans-serif'; x.fillStyle = '#444'; x.fillText(String(o.role || ''), 275, 180);
+        x.fillStyle = '#111'; x.font = '800 30px Arial, sans-serif'; x.fillText(String(o.serial || ''), 275, 235);
+        x.font = '16px Arial, sans-serif'; x.fillStyle = '#222';
+        var y = 275, lines = [].concat(o.mobile ? ['Mobile: ' + o.mobile] : [], o.joined ? ['Joining: ' + o.joined] : [], o.lines || []);
+        lines.slice(0, 5).forEach(function (l) { x.fillText(String(l).slice(0, 44), 275, y); y += 26; });
+        x.fillStyle = staff ? '#14365c' : '#1f5d3a'; x.fillRect(0, H - 62, W, 62);
+        x.fillStyle = '#fff'; x.font = '14px Arial, sans-serif';
+        x.fillText('Vivek Nagar, Ward no. 19, Maihar, MP - 485771', 28, H - 36); x.fillText('a2zbuildtech@gmail.com', 28, H - 14);
+        x.textAlign = 'right'; x.fillText('Company seal / signature', W - 28, H - 14); x.textAlign = 'left';
+        var lg = new Image(); lg.onload = function () { x.drawImage(lg, W - 88, 8, 76, 76); resolve(cv); }; lg.onerror = function () { resolve(cv); }; lg.src = 'logo.svg';
+      }
+      if (!o.photo) { x.fillStyle = '#777'; x.font = '16px Arial, sans-serif'; x.fillText('Photo nahi', 98, 260); text(); return; }
+      var im = new Image(); im.onload = function () {
+        var k = Math.max(220 / im.width, 270 / im.height), w = im.width * k, h = im.height * k;
+        x.save(); x.beginPath(); x.rect(28, 120, 220, 270); x.clip(); x.drawImage(im, 28 + (220 - w) / 2, 120 + (270 - h) / 2, w, h); x.restore(); text();
+      };
+      im.onerror = function () { text(); }; im.src = o.photo;
+    });
+  };
+  C.idCardShow = async function (o) {
+    var cv = await C.idCard(o), url = cv.toDataURL('image/png');
+    var box = document.createElement('div'); box.id = 'idmodal'; box.className = 'modal';
+    box.innerHTML = '<div class="modal-in"><img alt="ID card" class="idimg" src="' + url + '"><div class="row noprint"><button class="btn" data-idact="dl">PNG download</button><button class="btn sec" data-idact="print">Print</button><button class="btn sec" data-idact="close">Band karein</button></div></div>';
+    document.body.appendChild(box);
+    box.addEventListener('click', function (e) {
+      var a = e.target.getAttribute && e.target.getAttribute('data-idact');
+      if (a === 'close' || e.target === box) box.remove();
+      else if (a === 'print') { document.body.classList.add('printing-id'); window.print(); setTimeout(function () { document.body.classList.remove('printing-id'); }, 500); }
+      else if (a === 'dl') { var l = document.createElement('a'); l.href = url; l.download = (o.serial || 'id-card') + '.png'; document.body.appendChild(l); l.click(); l.remove(); }
+    });
+  };
+
   C.tradeLine = function (trades) {
     return trades.length ? trades.map(function (t) { return t.count + ' ' + C.esc(t.trade); }).join(' · ') : '<span class="mu">Abhi koi candidate nahi</span>';
   };

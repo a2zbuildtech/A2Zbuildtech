@@ -3,6 +3,12 @@
 (function(){
 'use strict';
 var D=A2ZData,C=A2ZCalc,METHODS=D.METHODS,FORMULAS=D.FORMULAS,TERMS=D.TERMS,CALCS=C.CALCS;
+var DIV='civil';
+function isMech(){return DIV==='mech'}
+function METH(){return isMech()?D.METHODS_MECH:METHODS}
+function FORM(){return isMech()?D.FORMULAS_MECH:FORMULAS}
+function CAL(){return isMech()?C.MCALCS:CALCS}
+function divBar(){return '<div class="chips" id="divBar" role="group" aria-label="Division">'+[['civil','Civil work · सिविल'],['mech','Mechanical work · मैकेनिकल']].map(function(x){return '<button class="chip" data-act="div" data-id="'+x[0]+'" aria-pressed="'+(x[0]===DIV)+'">'+x[1]+'</button>'}).join('')+'</div>'}
 var $=function(s,r){return (r||document).querySelector(s)};
 var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
 var noop=function(){};
@@ -42,14 +48,14 @@ function readCalc(c){
   calcVals[c.id]=v;return v;
 }
 function drawCalc(){
-  var c=CALCS.filter(function(x){return x.id===calcId})[0], sv=calcVals[c.id]||{};
+  var c=CAL().filter(function(x){return x.id===calcId})[0], sv=calcVals[c.id]||{};
   $('#calcBox').innerHTML='<h3>'+esc(c.n)+'<span class="hi">'+esc(c.hi)+'</span></h3><div class="grid">'+
     c.f.map(function(f){return fld(f,sv[f.k])}).join('')+
     '<label>Labour and margin on materials <em>(%)</em><input name="_lab" type="number" inputmode="decimal" min="0" value="'+labPct+'"></label></div><div class="scroll" id="calcOut"></div>';
   calcOut();
 }
 function calcOut(){
-  var c=CALCS.filter(function(x){return x.id===calcId})[0],v=readCalc(c),rows=c.run(v,rateOf);
+  var c=CAL().filter(function(x){return x.id===calcId})[0],v=readCalc(c),rows=c.run(v,rateOf);
   var tt=C.totals(rows,labPct),mat=tt.mat,lab=tt.lab;
   $('#calcOut').innerHTML='<table><thead><tr><th>Item</th><th class="n">Quantity</th><th>Unit</th><th class="n">Rate</th><th class="n">Amount</th></tr></thead><tbody>'+
    rows.map(function(r){return '<tr><td>'+esc(r.label)+'</td><td class="n">'+nf(r.qty)+'</td><td>'+esc(r.unit)+'</td><td class="n">'+(r.rate!=null?inr(r.rate):'–')+'</td><td class="n">'+(r.amt!=null?inr(r.amt):'–')+'</td></tr>'}).join('')+
@@ -108,47 +114,51 @@ function head(t,hi,sub){return '<div style="display:grid;gap:8px"><h2>'+esc(t)+(
 function contactCell(){var s=DB.settings;return (s.phone||s.email)?esc([s.phone,s.email].filter(Boolean).join(' · ')):'Add in Admin → Account'}
 
 V.home=function(){
-  return '<section class="hero"><div style="display:grid;gap:14px"><h1>Civil work and manpower, priced before the first brick.</h1>'+
-  '<p>सिविल कार्य और मैनपावर सप्लाई। पहले हिसाब, फिर काम। Estimate your quantities, check labour rates and see our terms before you call us.</p>'+
+  return '<section class="hero"><div style="display:grid;gap:14px"><h1>Civil and mechanical work, with manpower, priced before the first brick.</h1>'+
+  '<p>सिविल व मैकेनिकल कार्य और मैनपावर सप्लाई। पहले हिसाब, फिर काम। Estimate your quantities, check labour rates and see our terms before you call us.</p>'+
   '<div class="row"><a class="btn" href="#calculators">Estimate your work</a><a class="btn sec" href="#contact">Request a quote</a></div></div>'+
-  '<div class="tb"><div><small>Firm</small>A2Z Build Tech</div><div><small>Business</small>All type manpower supplier and civil works</div><div><small>Address</small>Vivek Nagar, Ward No. 19, Maihar, MP – 485771</div><div><small>Contact</small>'+contactCell()+'</div></div></section>'+
-  '<section>'+head('What we do','हमारे कार्य')+'<div class="cards">'+METHODS.map(function(m){return '<a class="card" href="#methods" style="text-decoration:none;color:inherit"><h3>'+esc(m.t)+'</h3><span class="mu">'+esc(m.hi)+'</span><span class="lbl">Measured in '+esc(m.u)+'</span></a>'}).join('')+'</div></section>'+
+  '<div class="tb"><div><small>Firm</small>A2Z Build Tech</div><div><small>Business</small>All type manpower supplier, civil and mechanical works</div><div><small>Address</small>Vivek Nagar, Ward No. 19, Maihar, MP – 485771</div><div><small>Contact</small>'+contactCell()+'</div></div></section>'+
+  '<section>'+head('What we do: civil work','हमारे कार्य: सिविल')+'<div class="cards">'+METHODS.map(function(m){return '<a class="card" href="#methods" data-act="setdiv" data-id="civil" style="text-decoration:none;color:inherit"><h3>'+esc(m.t)+'</h3><span class="mu">'+esc(m.hi)+'</span><span class="lbl">Measured in '+esc(m.u)+'</span></a>'}).join('')+'</div></section>'+
+  '<section id="mechHome">'+head('What we do: mechanical work','हमारे कार्य: मैकेनिकल','Fabrication, welding, piping, erection, rigging and maintenance, with trained mechanical manpower.')+'<div class="cards">'+D.METHODS_MECH.map(function(m){return '<a class="card" href="#methods" data-act="setdiv" data-id="mech" style="text-decoration:none;color:inherit"><h3>'+esc(m.t)+'</h3><span class="mu">'+esc(m.hi)+'</span><span class="lbl">Measured in '+esc(m.u)+'</span></a>'}).join('')+'</div></section>'+
   '<section>'+head('How an order runs','काम कैसे चलता है')+'<div class="cards"><div class="card"><span class="lbl">Step 1</span><h3>Measure and estimate</h3><p>Use the calculators for quantities and cost, or send us drawings.</p></div><div class="card"><span class="lbl">Step 2</span><h3>Agree the terms</h3><p>Rates, payment cycle, retention and safety are written into one agreement.</p></div><div class="card"><span class="lbl">Step 3</span><h3>Crew on site</h3><p>Trained workers report with attendance sheets signed daily.</p></div><div class="card"><span class="lbl">Step 4</span><h3>Bill and pay</h3><p>Running bills on measurement or man-days, with GST and TDS shown line by line.</p></div></div></section>';
 };
 V.methods=function(){
-  return '<section>'+head('Services and methods','कार्य विधि','The standard method we follow for each type of civil work, and how it is measured for billing.')+
-  METHODS.map(function(m,i){return '<details'+(i===0?' open':'')+'><summary><span>'+esc(m.t)+'<span class="hi">'+esc(m.hi)+'</span></span><span class="pill">'+esc(m.u)+'</span></summary><div class="in"><ol>'+m.s.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ol><div class="note">'+esc(m.r)+'</div></div></details>'}).join('')+'</section>';
+  return '<section>'+head('Services and methods','कार्य विधि','The standard method we follow for each type of '+(isMech()?'mechanical':'civil')+' work, and how it is measured for billing.')+divBar()+
+  METH().map(function(m,i){return '<details'+(i===0?' open':'')+'><summary><span>'+esc(m.t)+'<span class="hi">'+esc(m.hi)+'</span></span><span class="pill">'+esc(m.u)+'</span></summary><div class="in"><ol>'+m.s.map(function(s){return '<li>'+esc(s)+'</li>'}).join('')+'</ol><div class="note">'+esc(m.r)+'</div></div></details>'}).join('')+'</section>';
 };
 V.calculators=function(){
-  return '<section>'+head('Quantity and cost calculators','कैलकुलेटर','Pick the work, enter sizes in metres. Rates come from our rate list and can differ by market and time.')+
-  '<div class="chips" id="calcTabs">'+CALCS.map(function(c){return '<button class="chip" data-act="calc" data-id="'+c.id+'" aria-pressed="'+(c.id===calcId)+'">'+esc(c.n)+'</button>'}).join('')+'</div>'+
+  return '<section>'+head('Quantity and cost calculators','कैलकुलेटर','Pick the work, enter sizes as shown (metres unless a unit is written). Rates come from our rate list and can differ by market and time.')+
+  divBar()+'<div class="chips" id="calcTabs">'+CAL().map(function(c){return '<button class="chip" data-act="calc" data-id="'+c.id+'" aria-pressed="'+(c.id===calcId)+'">'+esc(c.n)+'</button>'}).join('')+'</div>'+
   '<div class="sheet" id="calcBox" data-live="calc"></div></section>'+
   '<section>'+head('Estimate a quote (BOQ)','बिल ऑफ क्वांटिटी','List each item with quantity and rate. We add overhead, profit and GST.')+'<div class="sheet" id="boqBox" data-live="boq"></div></section>';
 };
 B.calculators=function(){drawCalc();drawBoq()};
 V.manpower=function(){
-  return '<section>'+head('Manpower rates','मैनपावर रेट','Daily rate for each trade. Monthly is shown for 26 working days.')+
+  return '<section>'+head('Manpower rates','मैनपावर रेट','Daily rate for each trade. Monthly is shown for 26 working days.')+divBar()+
   '<div class="scroll"><table><thead><tr><th>Trade</th><th class="n">Per day</th><th class="n">Per month (26 days)</th></tr></thead><tbody>'+
-  DB.labour.map(function(x){return '<tr><td>'+esc(x.name)+'</td><td class="n">'+inr(x.rate)+'</td><td class="n">'+inr(x.rate*26)+'</td></tr>'}).join('')+'</tbody></table></div>'+
+  DB.labour.filter(function(x){return (x.div==='mech')===isMech()}).map(function(x){return '<tr><td>'+esc(x.name)+'</td><td class="n">'+inr(x.rate)+'</td><td class="n">'+inr(x.rate*26)+'</td></tr>'}).join('')+'</tbody></table></div>'+
   '<div class="note">These are working rates and may change with the site and season. The final rate is fixed in the agreement.</div></section>'+
   '<section>'+head('Manpower cost estimator','खर्च का हिसाब')+'<div class="sheet" id="mpBox" data-live="mp"></div></section>';
 };
 B.manpower=drawMp;
 V.formulas=function(){
-  return '<section>'+head('Standard formulas','सूत्र','The factors used by our calculators, so you can check any number yourself.')+
+  return '<section>'+head('Standard formulas','सूत्र','The factors used by our calculators, so you can check any number yourself.')+divBar()+
   '<div class="scroll"><table><thead><tr><th>What</th><th>Formula</th><th>Note</th></tr></thead><tbody>'+
-  FORMULAS.map(function(f){return '<tr><td>'+esc(f[0])+'</td><td style="font-family:var(--fm);font-size:13px">'+esc(f[1])+'</td><td class="mu">'+esc(f[2])+'</td></tr>'}).join('')+'</tbody></table></div></section>';
+  FORM().map(function(f){return '<tr><td>'+esc(f[0])+'</td><td style="font-family:var(--fm);font-size:13px">'+esc(f[1])+'</td><td class="mu">'+esc(f[2])+'</td></tr>'}).join('')+'</tbody></table></div></section>'+
+  (isMech()?'<section>'+head('Materials and consumables, A to Z','मटीरियल सूची','What a mechanical job uses, with the standard and the usual unit. Current prices are in Admin → Rates and on the calculators.')+'<div class="scroll"><table><thead><tr><th>Material</th><th>Standard or grade</th><th>Unit</th><th>Where it is used</th></tr></thead><tbody>'+D.MATREF.map(function(m){return '<tr><td>'+esc(m[0])+'</td><td class="mu">'+esc(m[1])+'</td><td>'+esc(m[2])+'</td><td class="mu">'+esc(m[3])+'</td></tr>'}).join('')+'</tbody></table></div></section>':'');
 };
 V.terms=function(){
   return '<section>'+head('Our standard terms','शर्तें','What we normally propose when we work with a company. Every point can be changed in the signed agreement.')+
   '<div class="cards">'+TERMS.map(function(t){return '<div class="card"><h3>'+esc(t[0])+'</h3><p>'+esc(t[1])+'</p></div>'}).join('')+'</div></section>';
 };
+V.help=function(){return '<section>'+head('Help','मदद','Website ke baare me kuch bhi poochhein: rate kahan dekhein, quote kaise maangein, calculator kaise chalayein.')+'<div id="helpBox"></div></section>'};
+B.help=function(){if(window.A2ZHelp)window.A2ZHelp.mount($('#helpBox'),'pub',{quick:['p-about','p-manpower','p-calc','p-contact','p-terms'],hello:'A2Z Build Tech ki website ke baare me poochhein: hamare kaam, manpower rate, calculator, quote, sampark.'})};
 V.contact=function(){
   return '<section>'+head('Contact and quote request','संपर्क')+
   '<div class="tb"><div><small>Address</small>Vivek Nagar, Ward No. 19, Maihar, MP – 485771</div><div><small>Phone and email</small>'+contactCell()+'</div></div>'+
   '<form class="sheet" data-form="quote"><div class="grid">'+
   fld({k:'name',l:'Your name',t:'text',r:1})+fld({k:'phone',l:'Phone',t:'tel',r:1})+
-  fld({k:'work',l:'Work needed',o:METHODS.map(function(m){return m.t}).concat(['Other'])})+
+  fld({k:'work',l:'Work needed',o:METHODS.map(function(m){return m.t}).concat(D.METHODS_MECH.map(function(m){return m.t})).concat(['Other'])})+
   '</div><div class="grid">'+fld({k:'msg',l:'Site location and details',t:'area'})+'</div>'+
   '<div class="row"><button class="btn" type="submit">Prepare request</button></div><div id="quoteOut"></div></form></section>';
 };
@@ -324,6 +334,8 @@ LIVE.boq=function(){boqOut()};
 LIVE.mp=function(){mpOut()};
 
 /* ---------- actions ---------- */
+ACTS.setdiv=function(b){DIV=b.dataset.id==='mech'?'mech':'civil';calcId=CAL()[0].id};
+ACTS.div=function(b){DIV=b.dataset.id==='mech'?'mech':'civil';calcId=CAL()[0].id;render()};
 ACTS.calc=function(b){calcId=b.dataset.id;$$('#calcTabs .chip').forEach(function(c){c.setAttribute('aria-pressed',c.dataset.id===calcId)});drawCalc()};
 ACTS.boqadd=function(){syncBoq();boq.push({d:'',u:'',q:0,r:0});drawBoq()};
 ACTS.boqdel=function(b){syncBoq();boq.splice(+b.dataset.i,1);drawBoq()};
@@ -331,7 +343,7 @@ ACTS.mpadd=function(){syncMp();mp.push({t:DB.labour[0]?DB.labour[0].id:'',n:1,d:
 ACTS.mpdel=function(b){syncMp();mp.splice(+b.dataset.i,1);drawMp()};
 ACTS.logout=function(){doLogout(false)};
 ACTS.tab=function(b){tab=b.dataset.id;render()};
-ACTS.addrate=function(b){var l=b.dataset.l;DB[l].push(l==='mats'?{id:uid(),name:'New material',unit:'nos',rate:0}:{id:uid(),name:'New trade',rate:0});save();render()};
+ACTS.addrate=function(b){var l=b.dataset.l;DB[l].push(l==='mats'?{id:uid(),name:'New material',unit:'nos',rate:0,div:DIV}:{id:uid(),name:'New trade',rate:0,div:DIV});save();render()};
 var armed=null,armT;
 ACTS.del=function(b){
   if(armed!==b){if(armed){armed.textContent='Delete'}armed=b;b.textContent='Sure?';clearTimeout(armT);armT=setTimeout(function(){if(armed===b){b.textContent='Delete';armed=null}},3000);return}
@@ -348,7 +360,7 @@ document.addEventListener('click',function(e){var b=e.target.closest('[data-act]
 document.addEventListener('input',function(e){var w=e.target.closest('[data-live]');if(w&&LIVE[w.dataset.live])LIVE[w.dataset.live](w,e.target)});
 
 /* ---------- router ---------- */
-var ROUTES=[['home','Home'],['methods','Services and methods'],['calculators','Calculators'],['manpower','Manpower'],['formulas','Formulas'],['terms','Terms'],['contact','Contact'],['admin','Admin']];
+var ROUTES=[['home','Home'],['methods','Services and methods'],['calculators','Calculators'],['manpower','Manpower'],['formulas','Formulas'],['terms','Terms'],['help','Help'],['contact','Contact'],['admin','Admin']];
 function current(){var r=(location.hash||'#home').slice(1);return V[r]?r:'home'}
 function render(){
   var r=current();

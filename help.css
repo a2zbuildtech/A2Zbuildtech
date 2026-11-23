@@ -1,0 +1,24 @@
+/* FILE: help.css  (GitHub par isi naam se upload karein) */
+.hlp{display:grid;gap:12px;max-width:860px}
+.hlp-log{display:grid;gap:10px;max-height:62vh;overflow:auto;padding:4px 2px;min-height:120px}
+.hlp-m{padding:10px 12px;border-radius:10px;border:1px solid var(--ln);background:var(--sf);color:var(--fg);max-width:100%;overflow-wrap:anywhere}
+.hlp-m.me{justify-self:end;background:var(--soft);max-width:88%}
+.hlp-m h4{margin:0 0 6px;font-size:15px}
+.hlp-m p{margin:6px 0}
+.hlp-m ol{margin:6px 0 6px 20px;padding:0;display:grid;gap:5px}
+.hlp-where{font-size:13px;color:var(--mu)}
+.hlp-tip{font-size:13px;border-left:3px solid var(--ac);padding:4px 8px;margin-top:6px;background:var(--soft)}
+.hlp-sep{border:0;border-top:1px dashed var(--ln);margin:10px 0}
+.hlp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.hlp-chip{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--ln);border-radius:999px;background:var(--sf);color:var(--fg);cursor:pointer}
+.hlp-chip:hover,.hlp-chip:focus-visible{border-color:var(--ac);outline:none}
+.hlp-form{display:flex;gap:8px;align-items:center}
+.hlp-form input{flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--ln);border-radius:8px;background:var(--sf);color:var(--fg)}
+.hlp-form button{font:inherit;font-weight:600;padding:10px 16px;border:0;border-radius:8px;background:var(--ac);color:var(--acf);cursor:pointer}
+.hlp-cat{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);font-weight:700;margin:8px 0 4px}
+.hlp-note{font-size:12px;color:var(--mu)}
+.hlp-lock{border-left:3px solid var(--bad)}
+.pwa-bar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 44px 10px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:#0f2a47;color:#fff;font-size:14px;box-shadow:0 -2px 12px rgba(0,0,0,.25)}
+.pwa-go{font:inherit;font-weight:700;border:0;border-radius:8px;padding:8px 14px;background:#ff8a3d;color:#1a0d05;cursor:pointer}
+.pwa-x{position:absolute;right:6px;top:50%;transform:translateY(-50%);font:inherit;font-size:22px;line-height:1;border:0;background:transparent;color:#fff;padding:6px 10px;cursor:pointer}
+@media (display-mode: standalone){body{-webkit-tap-highlight-color:transparent}header.top{padding-top:env(safe-area-inset-top)}}
