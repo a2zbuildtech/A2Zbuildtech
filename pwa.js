@@ -2,6 +2,38 @@
 /* Website ko mobile par "app" ki tarah install karne ke liye: service worker chalu karta hai aur "App install karein" patti dikhata hai. */
 (function () {
   'use strict';
+  /* Password ki jagah "aankh" (eye) button: dabane par likha hua password dikhta hai, dobara dabane par chhup jata hai.
+     Ye sab password khanon par apne-aap lagta hai (admin, staff aur main website), isliye is file me hai. */
+  var EYE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a19 19 0 0 1 5-5.9M9.9 5.2A10.4 10.4 0 0 1 12 5c7 0 11 7 11 7a19 19 0 0 1-2.2 3.2M14.1 14.1A3 3 0 1 1 9.9 9.9"/><path d="M1 1l22 22"/></svg>';
+  function hide(inp, btn) { if (inp.type !== 'password') { inp.type = 'password'; } btn.setAttribute('aria-pressed', 'false'); btn.setAttribute('aria-label', 'Password dikhayein'); btn.title = 'Password dikhayein'; btn.innerHTML = EYE; }
+  function wrapOne(inp) {
+    if (inp.getAttribute('data-eye') || !inp.parentNode) return;
+    inp.setAttribute('data-eye', '1');
+    var w = document.createElement('span'); w.className = 'pwwrap';
+    inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'pweye'; b.tabIndex = 0; hide(inp, b); w.appendChild(b);
+    var timer = 0;
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    b.addEventListener('click', function () {
+      if (inp.type === 'password') {
+        inp.type = 'text'; b.setAttribute('aria-pressed', 'true'); b.setAttribute('aria-label', 'Password chhupayein'); b.title = 'Password chhupayein'; b.innerHTML = EYE_OFF;
+        clearTimeout(timer); timer = setTimeout(function () { hide(inp, b); }, 20000);   // 20 second baad apne-aap chhup jata hai
+      } else { clearTimeout(timer); hide(inp, b); }
+      try { inp.focus(); } catch (e) {}
+    });
+    var f = inp.form; if (f) f.addEventListener('submit', function () { clearTimeout(timer); hide(inp, b); }, true);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) { clearTimeout(timer); hide(inp, b); } });
+  }
+  var queued = false;
+  function scan() { queued = false; var l = document.querySelectorAll('input[type="password"]:not([data-eye])'); for (var i = 0; i < l.length; i++) wrapOne(l[i]); }
+  function queue() { scan(); }   // turant (usi micro-task me) chalta hai, taaki likhte samay khana na hile
+  try { new MutationObserver(queue).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) {}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', queue); else queue();
+})();
+
+(function () {
+  'use strict';
   try { if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
   var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   if (standalone) return;

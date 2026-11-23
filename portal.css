@@ -117,3 +117,10 @@ tr.err td{background:var(--warnbg)}
 .pill.sev-high,.pill.sev-critical{background:var(--bad);color:var(--acf)}
 .alert-bar{border-left-color:var(--bad);background:var(--warnbg)}
 .grow{flex:1 1 240px}
+
+/* Password ki aankh (eye) */
+.pwwrap{position:relative;display:block;min-width:0}
+.pwwrap input{width:100%;padding-right:44px}
+.pweye{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:40px;height:34px;display:grid;place-items:center;padding:0;border:0;background:transparent;color:var(--mu);cursor:pointer;border-radius:4px}
+.pweye:hover,.pweye[aria-pressed="true"]{color:var(--fg)}
+.pweye:focus-visible{outline:2px solid var(--fg);outline-offset:0}
