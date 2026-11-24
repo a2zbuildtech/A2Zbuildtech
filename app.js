@@ -360,11 +360,11 @@ document.addEventListener('click',function(e){var b=e.target.closest('[data-act]
 document.addEventListener('input',function(e){var w=e.target.closest('[data-live]');if(w&&LIVE[w.dataset.live])LIVE[w.dataset.live](w,e.target)});
 
 /* ---------- router ---------- */
-var ROUTES=[['home','Home'],['methods','Services and methods'],['calculators','Calculators'],['manpower','Manpower'],['formulas','Formulas'],['terms','Terms'],['help','Help'],['contact','Contact'],['admin','Admin']];
-function current(){var r=(location.hash||'#home').slice(1);return V[r]?r:'home'}
+var ROUTES=[['home','Home'],['methods','Services and methods'],['calculators','Calculators'],['manpower','Manpower'],['formulas','Formulas'],['terms','Terms'],['help','Help'],['contact','Contact']];
+function current(){var r=(location.hash||'#home').slice(1);return r!=='admin'&&V[r]?r:'home'}   /* admin public site par nahi hai */
 function render(){
   var r=current();
-  $('#nav').innerHTML=ROUTES.map(function(x){return '<a href="#'+x[0]+'"'+(x[0]===r?' aria-current="page"':'')+'>'+(x[0]==='admin'&&!AUTH?'Admin login':x[1])+'</a>'}).join('');
+  $('#nav').innerHTML=ROUTES.map(function(x){return '<a href="#'+x[0]+'"'+(x[0]===r?' aria-current="page"':'')+'>'+x[1]+'</a>'}).join('');
   $('#app').innerHTML=V[r]();
   (B[r]||noop)();
   document.title='A2Z Build Tech';

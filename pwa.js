@@ -2,6 +2,21 @@
 /* Website ko mobile par "app" ki tarah install karne ke liye: service worker chalu karta hai aur "App install karein" patti dikhata hai. */
 (function () {
   'use strict';
+  /* Button dabane ka effect: har button / link par dabate hi halka sikudna + chamak, taaki pata chale click hua. */
+  (function () {
+    var SEL = 'button, .btn, a[href], [data-act], summary, label.file-btn, [role=button]';
+    document.addEventListener('pointerdown', function (e) {
+      var t = e.target && e.target.closest ? e.target.closest(SEL) : null;
+      if (!t || t.disabled) return;
+      t.classList.remove('pressed'); void t.offsetWidth; t.classList.add('pressed');
+      setTimeout(function () { t.classList.remove('pressed'); }, 450);
+    }, true);
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var t = e.target && e.target.closest ? e.target.closest('button, .btn, [data-act]') : null;
+      if (t) { t.classList.add('pressed'); setTimeout(function () { t.classList.remove('pressed'); }, 450); }
+    }, true);
+  }());
   /* Password ki jagah "aankh" (eye) button: dabane par likha hua password dikhta hai, dobara dabane par chhup jata hai.
      Ye sab password khanon par apne-aap lagta hai (admin, staff aur main website), isliye is file me hai. */
   var EYE = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';

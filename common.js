@@ -24,19 +24,50 @@
     return /^\d{4}-\d{2}$/.test(m) ? n[+m.slice(5) - 1] + ' ' + m.slice(0, 4) : m;
   };
   var tt;
+  /* kaam chalte waqt upar patti + cursor, taaki pata rahe ki click ho gaya aur kaam ho raha hai */
+  var busyN = 0;
+  function busyOn() { busyN++; if (busyN === 1) { var b = document.createElement('div'); b.id = 'busybar'; b.className = 'busybar'; b.setAttribute('role', 'progressbar'); b.setAttribute('aria-label', 'Kaam ho raha hai'); document.body.appendChild(b); document.body.classList.add('busy'); } }
+  function busyOff() { busyN = Math.max(0, busyN - 1); if (busyN === 0) { var b = document.getElementById('busybar'); if (b) b.remove(); document.body.classList.remove('busy'); } }
+  /* "Kaam ho gaya" ki chhoti screen: title + details ki list (ID, naam, mobile ...) + Copy / Theek hai */
+  C.done = function (title, rows, note) {
+    var old = document.getElementById('doneBox'); if (old) old.remove();
+    var ov = document.createElement('div'); ov.className = 'imged-ov'; ov.id = 'doneBox'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    var tr = (rows || []).filter(function (r) { return r && r[1] !== '' && r[1] != null; }).map(function (r) { return '<tr><th>' + C.esc(r[0]) + '</th><td>' + C.esc(r[1]) + '</td></tr>'; }).join('');
+    ov.innerHTML = '<div class="imged donebox"><div class="done-tick" aria-hidden="true">\u2713</div><h3>' + C.esc(title) + '</h3>' + (tr ? '<table class="donetbl"><tbody>' + tr + '</tbody></table>' : '') + (note ? '<p class="sm mu">' + C.esc(note) + '</p>' : '') +
+      '<div class="imged-row"><button type="button" class="btn" id="doneOk">Theek hai</button>' + (tr ? '<button type="button" class="btn sec" id="doneCopy">Details copy karein</button>' : '') + '</div></div>';
+    document.body.appendChild(ov);
+    var text = title + '\n' + (rows || []).filter(function (r) { return r && r[1] !== '' && r[1] != null; }).map(function (r) { return r[0] + ': ' + r[1]; }).join('\n');
+    ov.querySelector('#doneOk').addEventListener('click', function () { ov.remove(); });
+    var cp = ov.querySelector('#doneCopy'); if (cp) cp.addEventListener('click', function () { C.copy(text); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    ov.querySelector('#doneOk').focus();
+  };
+  /* ID dhundhna: "a2z-s-1", "A2Z-C-00012", mobile ya naam se. recs = [{kind, serial, name, phone, extra}] */
+  C.idKey = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^(a2z[a-z])0*(\d+)$/, '$1$2'); };
+  C.findIds = function (q, recs) {
+    var raw = String(q || '').trim(); if (raw.length < 2) return [];
+    var k = C.idKey(raw), digits = raw.replace(/\D/g, ''), low = raw.toLowerCase();
+    return recs.filter(function (r) {
+      var sk = C.idKey(r.serial);
+      if (sk && (sk === k || (k.length >= 5 && sk.indexOf(k) === 0))) return true;
+      if (digits.length >= 3 && String(r.phone || '').replace(/\D/g, '').indexOf(digits) >= 0) return true;
+      return String(r.name || '').toLowerCase().indexOf(low) >= 0;
+    }).slice(0, 40);
+  };
   C.toast = function (m) { var t = C.$('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2800); };
 
   /* Apps Script se baat: har request POST {a:'kaam', ...data, t:admin token, st:staff token}.
      Purane REST jaise naam (GET /api/admin/data?month=..) yahan action me badal jate hain. */
   var TKEY = 'a2z_admin_token';
-  function tget() { try { return sessionStorage.getItem(TKEY) || ''; } catch (e) { return ''; } }
-  function tset(v) { try { if (v) sessionStorage.setItem(TKEY, v); else sessionStorage.removeItem(TKEY); } catch (e) { /* ignore */ } }
+  /* login tab tak rahe jab tak logout na karein: localStorage me rakhte hain (refresh / naya tab / mobile band-khol par bhi) */
+  function tget() { try { return localStorage.getItem(TKEY) || sessionStorage.getItem(TKEY) || ''; } catch (e) { return ''; } }
+  function tset(v) { try { if (v) { localStorage.setItem(TKEY, v); } else { localStorage.removeItem(TKEY); sessionStorage.removeItem(TKEY); } } catch (e) { try { if (v) sessionStorage.setItem(TKEY, v); else sessionStorage.removeItem(TKEY); } catch (x) { /* ignore */ } } }
   C.api = async function (method, url, body, headers) {
     var cfg = window.A2Z_CONFIG || {}, base = cfg.API_URL || '';
     if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base)) throw new Error('config.js me Apps Script ka link (API_URL) abhi daala nahi gaya. Guide dekhein.');
     var u = String(url).replace(/^\/api\//, ''), qi = u.indexOf('?'), action = qi < 0 ? u : u.slice(0, qi), q = {};
     if (qi >= 0) u.slice(qi + 1).split('&').forEach(function (p) { var kv = p.split('='); q[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || ''); });
-    var r, j = null;
+    var r, j = null; busyOn();
     try {
       if (action === 'health') r = await fetch(base, { method: 'GET', cache: 'no-store' });
       else {
@@ -46,7 +77,8 @@
         r = await fetch(base, { method: 'POST', cache: 'no-store', body: JSON.stringify(payload) });   // content-type nahi: "simple request", Google ke liye zaruri
       }
       j = await r.json();
-    } catch (e) { throw new Error('Server se connect nahi ho pa raha. Internet jaanchein ya thodi der baad koshish karein.'); }
+    } catch (e) { busyOff(); throw new Error('Server se connect nahi ho pa raha. Internet jaanchein ya thodi der baad koshish karein.'); }
+    busyOff();
     if (!j || typeof j !== 'object') throw new Error('Server ka jawab samajh nahi aaya');
     var code = j._s || 200;
     if (action === 'admin/verify' && code === 200 && j.token) { tset(j.token); delete j.token; }

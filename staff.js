@@ -5,13 +5,13 @@
   'use strict';
   var $ = P.$, esc = P.esc, inr = P.inr, nf = P.nf;
   var HASH = (location.hash || '').slice(1), SKEY = 'a2z_staff_token';
-  function tget() { try { return sessionStorage.getItem(SKEY) || ''; } catch (e) { return ''; } }
-  function tset(v) { try { if (v) sessionStorage.setItem(SKEY, v); else sessionStorage.removeItem(SKEY); } catch (e) { /* ignore */ } }
+  function tget() { try { return localStorage.getItem(SKEY) || sessionStorage.getItem(SKEY) || ''; } catch (e) { return ''; } }
+  function tset(v) { try { if (v) { localStorage.setItem(SKEY, v); } else { localStorage.removeItem(SKEY); sessionStorage.removeItem(SKEY); } } catch (e) { try { if (v) sessionStorage.setItem(SKEY, v); else sessionStorage.removeItem(SKEY); } catch (x) { /* ignore */ } } }
   var LINK = /^[0-9a-f]{32}$/.test(HASH);                 // purana seedha link bhi chalta hai
   var TOKEN = LINK ? HASH : tget();
   var S = { month: P.thisMonth(), tab: 'home', view: null, screen: '', f: {}, form: null, hz: null, hzParty: '', q: '', photos: {}, rq: null, pw: false, msg: '' };
   var TYPE = { agent: 'Staff', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
-  var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['hisaab', 'Mera hisaab'], ['help', 'Madad (Help)']];
+  var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['hisaab', 'Mera hisaab'], ['ids', 'ID dekhein'], ['help', 'Madad (Help)']];
 
   function api(method, url, body) { return P.api(method, url, body, { 'x-staff-token': TOKEN }); }
   function unit() { return S.view && S.view.perDay ? '/din' : '/mahina'; }
@@ -64,7 +64,7 @@
     if (S.screen !== 'app') return;
     var sx = ($('#hzs') || {}).scrollLeft;
     $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'cands' && pendingCands() ? ' (' + pendingCands() + ')' : '') + '</button>'; }).join('');
-    showPage(({ home: homeView, cands: candsView, hazri: hazriView, hisaab: hisaabView, help: helpView })[S.tab]());
+    showPage(({ home: homeView, cands: candsView, hazri: hazriView, hisaab: hisaabView, ids: idsView, help: helpView })[S.tab]());
     if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'staff', { quick: ['s-register', 's-cand-add', 's-hazri', 's-hisaab', 's-profile', 's-search', 's-rate'], hello: 'Staff panel ke saare kaam: login, registration, ID card, candidate admission form, hazri, hisaab. Apna sawal likhein, jaise "admission form kahan se milega?"' });
     if (sx && $('#hzs')) $('#hzs').scrollLeft = sx;
   }
@@ -80,6 +80,19 @@
   }
 
   /* ---------- Meri profile / ID ---------- */
+  /* ID dekhein: apni aur apne candidates ki ID, mobile / naam / ID likhkar */
+  function idRecs() {
+    var v = S.view, st = v.staff;
+    return [{ kind: 'Meri ID', serial: st.serial, name: st.name, phone: st.phone, extra: TYPE[st.type] || '' }].concat(v.candidates.map(function (c) { return { kind: 'Candidate', serial: c.serial, name: c.name, phone: c.mobile, extra: (c.trade || '') + (c.partyName ? ' \u00b7 ' + c.partyName : '') + (c.approval === 'pending' ? ' \u00b7 approval baaki' : '') }; }));
+  }
+  function idRows(q) {
+    if (!String(q || '').trim()) return '<div class="note">Mobile number, naam ya ID (jaise A2Z-C-00012 ya a2z-c-12) likhiye.</div>';
+    var f = P.findIds(q, idRecs()); if (!f.length) return '<div class="note warn">Kuch nahi mila. Mobile ke kam se kam 3 ank, ya naam / ID ke 2 akshar likhiye.</div>';
+    return '<div class="scroll"><table><thead><tr><th>Prakar</th><th>ID</th><th>Naam</th><th>Mobile</th><th>Jankari</th></tr></thead><tbody>' + f.map(function (r) { return '<tr><td>' + esc(r.kind) + '</td><td><b>' + esc(r.serial || '\u2014') + '</b></td><td>' + esc(r.name) + '</td><td>' + esc(r.phone || '') + '</td><td>' + esc(r.extra) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+  function idsView() {
+    return '<h2>ID dekhein</h2><div class="card"><label>Mobile / naam / ID likhiye<input id="idq" type="search" inputmode="search" autocomplete="off" placeholder="jaise 9876543210, Ram ya A2Z-C-00012" value="' + esc(S.idq || '') + '"></label><div id="idres">' + idRows(S.idq) + '</div></div>';
+  }
   function homeView() {
     var st = S.view.staff, ph = S.photos.self;
     if (st.hasPhoto && ph === undefined) fetchPhoto('self', 'self', '');
@@ -249,11 +262,13 @@
       b.disabled = true;
       try {
         var r = await api('POST', '/api/staff/cand-save', { month: S.month, consent: f.id ? undefined : true, item: item, photo: f.photo && !f.photoOld ? f.photo : undefined, docs: f.docs && Object.keys(f.docs).length ? f.docs : undefined });
-        S.view = r.view; S.form = null; S.f = {}; S.hz = null; render(); P.toast('Save ho gaya. Serial: ' + r.serial + (f.id ? '' : '. Ab "Approve" dabayein.'));
+        S.view = r.view; S.form = null; S.f = {}; S.hz = null; render();
+        var nc = r.view.candidates.filter(function (c) { return c.id === (r.id || f.id); })[0] || {};
+        P.done(f.id ? 'Candidate ki jankari save ho gayi' : 'Naya candidate jud gaya', [['Candidate ID', r.serial || nc.serial || ''], ['Naam', nc.name || item.name], ['Mobile', nc.mobile || item.mobile], ['Trade', nc.trade || item.trade], ['Party / Site', nc.partyName || ''], ['Halat', nc.approval === 'pending' || !f.id ? 'Approval baaki' : 'Chalu']], f.id ? '' : 'Ab "Approve" dabayein, tabhi hazri bharna shuru hoga.');
       } catch (e) { b.disabled = false; $('#lmsg').textContent = e.message; }
     },
     approvecand: async function (b) {
-      try { var r = await api('POST', '/api/staff/cand-approve', { id: b.dataset.id, month: S.month }); S.view = r.view; S.hz = null; render(); P.toast('Candidate approve ho gaya. Ab hazri bhar sakte hain.'); }
+      try { var r = await api('POST', '/api/staff/cand-approve', { id: b.dataset.id, month: S.month }); S.view = r.view; S.hz = null; render(); var ac = r.view.candidates.filter(function (c) { return c.id === b.dataset.id; })[0] || {}; P.done('Candidate approve ho gaya', [['Candidate ID', ac.serial || ''], ['Naam', ac.name || ''], ['Trade', ac.trade || ''], ['Party / Site', ac.partyName || '']], 'Ab hazri bhar sakte hain.'); }
       catch (e) { P.toast(e.message); }
     },
     candid: async function (b) {
@@ -287,6 +302,7 @@
   });
   document.addEventListener('input', function (e) {
     var t = e.target;
+    if (t.id === 'idq') { S.idq = t.value; var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); return; }
     if (t.dataset && t.dataset.f) S.f[t.dataset.f] = t.value;
     else if (t.id === 'q') { S.q = t.value; var pos = t.selectionStart; render(); var q = $('#q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
   });

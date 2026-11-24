@@ -4,7 +4,7 @@
   'use strict';
   var $ = P.$, $$ = P.$$, esc = P.esc, inr = P.inr, nf = P.nf, api = P.api;
   var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {} };
-  var TABS = [['dash', 'Overview'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
+  var TABS = [['dash', 'Overview'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
   var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
   var CMODE = { percent: 'Percent (%)', fixed: 'Fixed rate (trade-wise)', none: 'Koi hissa nahi (admin tay karega)' };
   function cmLabel(x) {
@@ -51,6 +51,17 @@
   function aprBtn(a) { return a === 'approved' ? '<span class="pill good">approve</span>' : a === 'rejected' ? '<span class="pill bad">reject</span>' : '<span class="pill warn">approval baaki</span>'; }
 
   function party(id) { return S.data.parties.filter(function (p) { return p.id === id; })[0]; }
+
+  /* "Kaam ho gaya" ki chhoti screen ke liye details */
+  function partyOf(id) { return S.data.parties.filter(function (p) { return p.id === id; })[0]; }
+  function sumRows(kind, id) {
+    var r;
+    if (kind === 'staff') { r = staff(id); if (!r) return null; return [['ID', r.serial || ''], ['Naam', r.name], ['Mobile (login ID)', r.phone], ['Prakar', TYPE[r.type] || r.type], ['Commission ka tareeka', cmLabel(Object.assign({}, r, { pct: r.commissionPct == null ? S.data.settings.commissionPct : r.commissionPct }))], ['Fixed vetan / mahina', r.fixedPay ? inr(r.fixedPay) : ''], ['Halat', r.regStatus === 'pending' ? 'Approval baaki' : 'Chalu']]; }
+    if (kind === 'candidates') { r = cand(id); if (!r) return null; var p = partyOf(r.partyId); return [['Candidate ID', r.serial || ''], ['Naam', r.name], ['Mobile', r.mobile], ['Trade', r.trade], ['Party / Site', p ? p.name : ''], ['Staff / Supplier', r.staffId ? whoS(r.staffId) : 'Direct (company)'], ['Join date', r.joinDate || ''], ['Halat', r.approval === 'pending' ? 'Approval baaki' : r.status === 'left' ? 'Kaam chhod diya' : 'Kaam par']]; }
+    if (kind === 'parties') { r = partyOf(id); if (!r) return null; return [['Party ID', r.serial || ''], ['Naam', r.name], ['Mobile', r.phone], ['Contact', r.contact || ''], ['Trade ke rate', String((r.rates || []).length)]]; }
+    return null;
+  }
+  async function doneSum(kind, id, title) { var rows = sumRows(kind, id); if (rows) P.done(title, rows); else P.toast(title); }
   function whoS(id, name) { var s = id ? staff(id) : null; return s ? s.name + (s.serial ? ' (' + s.serial + ')' : '') : (name || 'Direct'); }
   function cand(id) { return S.data.candidates.filter(function (p) { return p.id === id; })[0]; }
   function staff(id) { return S.data.staff.filter(function (p) { return p.id === id; })[0]; }
@@ -310,6 +321,23 @@
     return out;
   }
   function tradeTxt(t) { return Object.keys(t).map(function (k) { return k + ' ×' + t[k]; }).join(', '); }
+
+  /* ---------- ID dekhein: mobile / naam / ID likhkar company (party), staff, candidate sabki ID ---------- */
+  function idRecs() {
+    var d = S.data;
+    return d.staff.map(function (s) { return { kind: 'Staff / Supplier', serial: s.serial, name: s.name, phone: s.phone, extra: TYPE[s.type] || '' }; })
+      .concat(d.candidates.map(function (c) { var p = partyOf(c.partyId); return { kind: 'Candidate', serial: c.serial, name: c.name, phone: c.mobile, extra: (c.trade || '') + (p ? ' · ' + p.name : '') + (c.staffId ? ' · ' + whoS(c.staffId) : '') }; }))
+      .concat(d.parties.map(function (p) { return { kind: 'Party / Company', serial: p.serial, name: p.name, phone: p.phone, extra: p.contact || '' }; }));
+  }
+  function idRows(q) {
+    var f = P.findIds(q, idRecs());
+    if (!String(q || '').trim()) return '<div class="note">Upar mobile number, naam ya ID (jaise A2Z-S-0001 ya a2z-s-1) likhiye.</div>';
+    if (!f.length) return '<div class="note warn">Kuch nahi mila. Mobile ke kam se kam 3 ank, ya naam / ID ke 2 akshar likhiye.</div>';
+    return '<div class="scroll"><table><thead><tr><th>Prakar</th><th>ID</th><th>Naam</th><th>Mobile</th><th>Jankari</th></tr></thead><tbody>' + f.map(function (r) { return '<tr><td>' + esc(r.kind) + '</td><td><b>' + esc(r.serial || '—') + '</b></td><td>' + esc(r.name) + '</td><td>' + esc(r.phone || '') + '</td><td>' + esc(r.extra) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+  V.ids = function () {
+    return '<h2>ID dekhein</h2><div class="card"><label>Mobile / naam / ID likhiye<input id="idq" type="search" inputmode="search" autocomplete="off" placeholder="jaise 9876543210, Ram ya A2Z-S-0001" value="' + esc(S.idq || '') + '"></label><div id="idres">' + idRows(S.idq) + '</div></div>';
+  };
   V.sup = function () {
     var L = supData(), h = '<div class="row between"><h2>Manpower supplier: kaun si site me kitne candidate (' + P.monthName(S.month) + ')</h2><button class="btn sec" data-act="xsup">Sab suppliers ki Excel</button></div>';
     h += '<div class="note">Yahan har manpower supplier ke candidate, unki site (party), din aur commission dikhte hain. Supplier ko payment/salary nahi milti, sirf commission.</div>';
@@ -576,7 +604,7 @@
       if (o.id) item.id = o.id;
       var r = await api('POST', '/api/admin/save', { col: 'candidates', item: item, consent: (document.getElementById('consentBox') && document.getElementById('consentBox').checked) || undefined, photo: S.pph || undefined, docs: Object.keys(S.pdocs).length ? S.pdocs : undefined });
       if (!o.id && o.days !== '' && o.days != null) await api('POST', '/api/admin/attendance', { candId: r.id, month: S.month, days: o.days });
-      S.panel = null; await load(); P.toast('Save ho gaya');
+      S.panel = null; await load(); await doneSum('candidates', r.id || o.id, o.id ? 'Candidate ki jankari save ho gayi' : 'Naya candidate jud gaya');
     },
     staffpw: async function (f) { var o = collect(f); await api('POST', '/api/admin/staff-password', { id: o.id, pass: o.pass }); S.panel = null; await load(); P.toast('Password set ho gaya. Ab approve / login chalega.'); },
     advance: async function (f) {
@@ -601,7 +629,11 @@
     contact: async function (f) { await api('POST', '/api/admin/contact', collect(f)); f.reset(); P.toast('OTP ki email badal di'); },
     password: async function (f) { var o = collect(f); await api('POST', '/api/admin/password', o); P.toast('Password badla. Dobara login karein.'); loginScreen(); }
   };
-  async function save(col, item, photo, docs) { await api('POST', '/api/admin/save', { col: col, item: item, photo: photo || undefined, docs: docs && Object.keys(docs).length ? docs : undefined }); S.panel = null; S.pph = ''; S.pdocs = {}; S.sph = {}; await load(); P.toast('Save ho gaya'); }
+  async function save(col, item, photo, docs) {
+    var r = await api('POST', '/api/admin/save', { col: col, item: item, photo: photo || undefined, docs: docs && Object.keys(docs).length ? docs : undefined }); S.panel = null; S.pph = ''; S.pdocs = {}; S.sph = {}; await load();
+    var nw = !item.id, T = { staff: nw ? 'Naya staff ban gaya' : 'Staff ki jankari save ho gayi', parties: nw ? 'Nayi party jud gayi' : 'Party ki jankari save ho gayi' };
+    if (T[col]) await doneSum(col, r.id || item.id, T[col]); else P.toast('\u2713 Save ho gaya');
+  }
 
   /* ---------- render ---------- */
   function keepScroll() { var e = $('#hzs'); S.hzKeep = e ? e.scrollLeft : null; }
@@ -729,10 +761,10 @@
       if (!cr.commMode) throw new Error('Pehle commission ka tareeka chuniye (percent / fixed rate / koi hissa nahi)');
       if (cr.commMode === 'fixed' && !cr.fixedRates.length) throw new Error('Fixed rate chuna hai to kam se kam ek trade ka rate likhiye');
       await api('POST', '/api/admin/staff-approve', { id: id, type: $('#aty-' + id).value, commMode: cr.commMode, fixedRates: cr.fixedRates, commissionPct: $('[name=commissionPct]', box).value });
-      await load(); P.toast('Staff approve ho gaya. Staff ID ban gayi, ab wo login kar sakta hai.');
+      await load(); await doneSum('staff', id, 'Staff approve ho gaya. Ab wo login kar sakta hai');
     },
     rjstaff: async function (b) { await api('POST', '/api/admin/staff-approve', { id: b.dataset.id, ok: false }); await load(); P.toast('Registration reject ho gaya'); },
-    apcand: async function (b) { await api('POST', '/api/admin/cand-approve', { id: b.dataset.id }); await load(); P.toast('Candidate approve ho gaya'); },
+    apcand: async function (b) { await api('POST', '/api/admin/cand-approve', { id: b.dataset.id }); await load(); await doneSum('candidates', b.dataset.id, 'Candidate approve ho gaya'); },
     rjcand: async function (b) { await api('POST', '/api/admin/cand-approve', { id: b.dataset.id, ok: false }); await load(); P.toast('Candidate reject ho gaya'); },
     apatt: async function (b) { await api('POST', '/api/admin/att-approve', { items: [{ candId: b.dataset.id, month: b.dataset.m }] }); await load(); P.toast('Hazri approve ho gayi'); },
     rjatt: async function (b) { await api('POST', '/api/admin/att-approve', { items: [{ candId: b.dataset.id, month: b.dataset.m }], ok: false }); await load(); P.toast('Hazri wapas kar di'); },
@@ -830,6 +862,7 @@
     } else if (t.name === 'fparty') { S.f.party = t.value; render(); } else if (t.name === 'fstaff') { S.f.staff = t.value; render(); } else if (t.name === 'hzp') { S.hzParty = t.value; S.hz = null; render(); }
   });
   document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'idq') { S.idq = e.target.value; var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); return; }
     var t = e.target;
     if (t.id === 'fq') { S.f.q = t.value; render(); }
     if (t.id === 'remText') { var a = $('#waBtn'); if (a && S.panel) { var p = party(S.panel.id); a.href = P.waLink(p.phone, t.value); } }
