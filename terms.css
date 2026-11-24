@@ -1,0 +1,9 @@
+.tcpage{padding-block:24px;max-width:1000px}
+.tcpage h1{font-size:28px;margin:0 0 4px}.tcpage h1 small,.tc h2 small{display:block;font-size:.55em;font-weight:500;opacity:.7}
+.tc h2{font-size:20px;margin:26px 0 8px;border-bottom:2px solid #c9a13b;padding-bottom:4px}
+.tc-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:10px 0;border-bottom:1px solid #8884}
+.tc-row p{margin:0;line-height:1.6;font-size:15px}[lang=hi]{font-family:"Noto Sans Devanagari",Inter,sans-serif}
+.tc-note{background:#fff8e1;color:#4a3a00;border-left:4px solid #c9a13b;padding:10px 14px;border-radius:6px;line-height:1.6}
+.tc-ver{opacity:.7;font-size:13px}.tc-disc{font-size:13px;opacity:.85;margin-top:24px}
+@media(max-width:700px){.tc-row{grid-template-columns:1fr;gap:6px}}
+@media print{.top,footer,.btn{display:none}.tc-row{break-inside:avoid}}

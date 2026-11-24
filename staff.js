@@ -19,7 +19,7 @@
   /* ---------- chhote form helpers ---------- */
   function fld(label, key, o) {
     o = o || {}; var v = S.f[key] == null ? '' : S.f[key];
-    return '<label>' + esc(label) + (o.req ? ' *' : '') + '<input data-f="' + key + '" type="' + (o.type || 'text') + '" value="' + esc(v) + '"' + (o.list ? ' list="' + o.list + '"' : '') + (o.max ? ' maxlength="' + o.max + '"' : '') + (o.mode ? ' inputmode="' + o.mode + '"' : '') + ' autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '></label>';
+    return '<label>' + esc(label) + (o.req ? ' *' : '') + '<input data-f="' + key + '" type="' + (o.type || 'text') + '" value="' + esc(v) + '"' + (o.list ? ' list="' + o.list + '"' : '') + (o.max ? ' maxlength="' + o.max + '"' : '') + (o.mode ? ' inputmode="' + o.mode + '"' : '') + ' autocomplete="off"' + (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + '>' + (window.A2ZHints ? A2ZHints.html(o.hintKey || key) : '') + '</label>';
   }
   function photoBox(dataUrl, hint) { return '<div><div class="photo-box" id="pbox">' + (dataUrl ? '<img alt="photo" src="' + esc(dataUrl) + '">' : esc(hint || 'Photo')) + '</div><label class="btn sec sm file-btn mt6">Photo chunein<input type="file" id="photoFile" accept="image/*" class="hide"></label></div>'; }
   function showPage(html) { $('#app').innerHTML = html; }
@@ -41,11 +41,12 @@
       '<div class="row ai-start">' + photoBox(S.f.photo, 'Apni photo') + '<div class="form-grid grow">' +
       fld('Poora naam', 'name', { req: 1, max: 80 }) + fld('Pita / pati ka naam', 'father', { max: 80 }) + fld('Janm tithi', 'dob', { type: 'date' }) +
       fld('Mobile number', 'phone', { req: 1, mode: 'numeric', max: 14 }) + fld('Email', 'email', { type: 'email', max: 80 }) + fld('Pura pata', 'address', { req: 1, max: 200 }) +
-      '</div></div><div class="sec-h">Bank / pehchan (zaruri hone par)</div><div class="form-grid">' +
+      '</div></div>' + P.docSlots([], S.f.docs, false) + '<div class="sec-h">Bank / pehchan (zaruri hone par)</div><div class="form-grid">' +
       fld('Aadhaar number (12 ank)', 'aadhaar', { mode: 'numeric', max: 14 }) + fld('Bank khata number', 'bank', { mode: 'numeric', max: 22 }) + fld('IFSC', 'ifsc', { max: 11, ph: 'SBIN0001234' }) + fld('UPI ID', 'upi', { max: 60 }) +
       '</div><div class="sec-h">Apna password banayein</div><div class="form-grid">' +
       fld('Password (10+ akshar, akshar aur ank dono)', 'pass', { type: 'password', req: 1, max: 100 }) + fld('Password dobara', 'pass2', { type: 'password', req: 1, max: 100 }) +
-      '</div><div class="hide"><input data-f="website" tabindex="-1" autocomplete="off" aria-hidden="true"></div>' +
+      '</div>' + '<label class="consent span-all"><input type="checkbox" id="consentBox"> Maine <a href="terms.html" target="_blank" rel="noopener">Terms / Niyam aur Shartein</a> padh liye hain aur main unse tatha apni photo, documents aur jankari ke kaam ke liye istemal (DPDP Act) se sahmat hu.</label>' +
+      '<div class="hide"><input data-f="website" tabindex="-1" autocomplete="off" aria-hidden="true"></div>' +
       '<div class="msg" id="lmsg" role="alert"></div><div class="row"><button class="btn" data-act="register">Registration bhejein</button><button class="btn sec" data-act="backlogin">Wapas login par</button></div></div>');
   }
 
@@ -125,8 +126,10 @@
       fld('Candidate ka poora naam', 'name', { req: 1, max: 80 }) + fld('Pita / pati ka naam', 'father', { max: 80 }) + fld('Trade (kaam)', 'trade', { req: 1, list: 'trades', max: 40 }) + fld('Janm tithi', 'dob', { type: 'date' }) + fld('Joining date', 'joinDate', { type: 'date' }) + '</div></div>' +
       '<datalist id="trades">' + Object.keys(trades).map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist>' +
       '<div class="sec-h">Sampark</div><div class="form-grid">' + fld('Mobile', 'mobile', { mode: 'numeric', max: 14 }) + fld('Dusra mobile', 'mobile2', { mode: 'numeric', max: 14 }) + fld('Pura pata', 'address', { max: 200 }) + fld('Emergency me kisko phone karein', 'emergency', { max: 80 }) + fld('Emergency mobile', 'emergencyPhone', { mode: 'numeric', max: 14 }) + '</div>' +
+      P.docSlots(f.docKeys, f.docs, edit) +
       '<div class="sec-h">Pehchan, bank aur anubhav</div><div class="form-grid">' + fld('Aadhaar (12 ank)', 'aadhaar', { mode: 'numeric', max: 14 }) + fld('Bank khata', 'bank', { mode: 'numeric', max: 22 }) + fld('IFSC', 'ifsc', { max: 11 }) + fld('UPI ID', 'upi', { max: 60 }) + fld('Anubhav (kitne saal / kahan)', 'experience', { max: 120 }) + '</div>' +
       (edit ? '<label class="mw240">Halat<select data-f="status"><option value="active"' + (f.status !== 'left' ? ' selected' : '') + '>Kaam par hai</option><option value="left"' + (f.status === 'left' ? ' selected' : '') + '>Kaam chhod diya</option></select></label>' : '') +
+      (edit ? '' : '<label class="consent span-all"><input type="checkbox" id="consentBox"> Candidate ne <a href="terms.html" target="_blank" rel="noopener">Terms / Niyam aur Shartein</a> padh/sun liye hain aur wo apni photo, documents aur jankari ke kaam ke liye istemal (DPDP Act) se sahmat hai (candidate ki raza se hi tick karein).</label>') +
       '<div class="msg" id="lmsg" role="alert"></div><div class="row"><button class="btn" data-act="savecand">Save karein</button><button class="btn sec" data-act="cancelcand">Band karein</button></div></div>';
   }
 
@@ -172,6 +175,12 @@
   }
 
   /* ---------- Mera hisaab ---------- */
+  function commNote(st) {
+    if (st.commMode === 'percent') return 'Commission = candidate ke kaam se bane munafe ka ' + st.pct + '%.';
+    if (st.commMode === 'fixed') return 'Commission = har candidate ke din \u00d7 uske trade ka fixed rate (' + (st.fixedRates || []).map(function (r) { return esc(r.trade) + ' \u20b9' + esc(r.rate) + '/din'; }).join(', ') + '). Candidate kitne bhi hon, rate wahi rehta hai.';
+    if (st.commMode === 'none') return 'Aapke liye koi commission tay nahi hai (admin hi tay karta hai).';
+    return 'Aapka commission ka tareeka admin ne abhi tay nahi kiya, isliye abhi commission \u20b90 dikh raha hai.';
+  }
   function hisaabView() {
     var v = S.view, t = v.totals;
     return '<div class="row between noprint"><h2>Mera hisaab (' + P.monthName(S.month) + ')</h2><button class="btn sec" data-act="print">Print</button></div>' + summary() +
@@ -182,7 +191,7 @@
       (v.candidates.filter(function (c) { return c.approval === 'approved'; }).map(function (c) { return '<tr><td class="xs">' + esc(c.serial) + '</td><td>' + esc(c.name) + '</td><td>' + esc(c.partyName) + '</td><td>' + esc(c.trade) + '</td><td class="n">' + nf(c.days) + '</td><td class="n">' + inr(c.payRate) + '</td><td class="n">' + inr(c.pay) + '</td><td class="n">' + inr(c.advance) + '</td><td class="n">' + inr(c.paid) + '</td><td class="n">' + inr(r2(c.pay - c.advance - c.paid)) + '</td></tr>'; }).join('') || '<tr><td colspan="9" class="mu">Koi nahi</td></tr>') + '</tbody></table></div>' +
       (v.advances.length ? '<h3>Advance</h3><div class="card scroll"><table><thead><tr><th>Tarikh</th><th>Kiska</th><th>Note</th><th class="n">Rakam</th></tr></thead><tbody>' + v.advances.map(function (a) { var c = v.candidates.filter(function (x) { return x.id === a.refId; })[0]; return '<tr><td>' + P.dd(a.date) + '</td><td>' + (a.kind === 'staff' ? 'Aapka' : esc(c ? c.name : '')) + '</td><td>' + esc(a.note) + '</td><td class="n">' + inr(a.amount) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '') +
       (v.payments.length ? '<h3>Payments (jo chukaye gaye)</h3><div class="card scroll"><table><thead><tr><th>Tarikh</th><th>Kisko</th><th>Tareeka</th><th>Note</th><th class="n">Rakam</th></tr></thead><tbody>' + v.payments.map(function (p) { var c = v.candidates.filter(function (x) { return x.id === p.refId; })[0]; return '<tr><td>' + P.dd(p.date) + '</td><td>' + (p.kind === 'staff' ? 'Aapko' : esc(c ? c.name : '')) + '</td><td>' + esc(({ cash: 'Cash', upi: 'UPI', bank: 'Bank', other: 'Anya' })[p.mode] || p.mode) + '</td><td>' + esc(p.note) + '</td><td class="n">' + inr(p.amount) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '') +
-      '<div class="note">Commission = candidate ke kaam se bane munafe ka ' + v.staff.pct + '%. Isme se GST ' + v.gstPct + '% kat kar "Net" milta hai. Jo hazri admin ne approve nahi ki wo yahan andaze me judti hai, admin ke final hisaab me approve hone par judti hai.</div>';
+      '<div class="note">' + commNote(v.staff) + ' Isme se GST ' + v.gstPct + '% kat kar "Net" milta hai. Jo hazri admin ne approve nahi ki wo yahan andaze me judti hai, admin ke final hisaab me approve hone par judti hai.</div>';
   }
 
   /* ---------- photos ---------- */
@@ -193,7 +202,11 @@
   }
 
   /* ---------- actions ---------- */
+  function refreshDocs() { var el = document.querySelector('.docslots'); if (el) el.outerHTML = P.docSlots(S.f.docKeys, S.f.docs, !!S.f.id); }
   var A = {
+    docpend: function (b) { P.viewImage(S.f.docs[b.dataset.doc], 'Document'); },
+    docdrop: function (b) { delete S.f.docs[b.dataset.doc]; refreshDocs(); },
+    docview: async function (b) { var r = await api('POST', '/api/staff/photo', { kind: 'cand', id: S.f.id, doc: b.dataset.doc }); if (r.photo) P.viewImage(r.photo, 'Document'); else P.toast('Document nahi mila'); },
     tab: function (b) { S.tab = b.dataset.id; S.form = null; S.rq = null; render(); },
     regform: function () { S.f = {}; regScreen(); },
     backlogin: function () { S.f = {}; loginScreen(); },
@@ -208,9 +221,10 @@
     register: async function (b) {
       var f = S.f; $('#lmsg').textContent = '';
       if (!f.photo) { $('#lmsg').textContent = 'Apni photo lagayein'; return; }
+      if (!$('#consentBox').checked) { $('#lmsg').textContent = 'Terms padhkar sahmati ka tick lagayein'; return; }
       b.disabled = true;
       try {
-        await P.api('POST', '/api/staff/register', { website: f.website || '', photo: f.photo, item: { name: f.name, father: f.father, dob: f.dob, phone: f.phone, email: f.email, address: f.address, aadhaar: f.aadhaar, bank: f.bank, ifsc: f.ifsc, upi: f.upi, pass: f.pass, pass2: f.pass2 } });
+        await P.api('POST', '/api/staff/register', { website: f.website || '', consent: true, photo: f.photo, docs: f.docs || undefined, item: { name: f.name, father: f.father, dob: f.dob, phone: f.phone, email: f.email, address: f.address, aadhaar: f.aadhaar, bank: f.bank, ifsc: f.ifsc, upi: f.upi, pass: f.pass, pass2: f.pass2 } });
         S.f = {}; showPage('<div class="panel login"><h2>Registration mil gaya</h2><div class="note">Admin aapki jankari jaanch kar approve karega. Approve hone par aapko <b>Staff ID</b> milegi (email dene par email bhi aayegi) aur aap apne mobile number / ID aur password se login kar paayenge.</div><button class="btn" data-act="backlogin">Login page</button></div>');
       } catch (e) { b.disabled = false; $('#lmsg').textContent = e.message; }
     },
@@ -231,9 +245,10 @@
     cancelcand: function () { S.form = null; S.f = {}; render(); },
     savecand: async function (b) {
       var f = S.f, item = {}; ['id', 'partyId', 'name', 'father', 'mobile', 'mobile2', 'trade', 'dob', 'joinDate', 'address', 'aadhaar', 'bank', 'ifsc', 'upi', 'emergency', 'emergencyPhone', 'experience', 'status'].forEach(function (x) { if (f[x] !== undefined) item[x] = f[x]; });
+      if (!f.id && !$('#consentBox').checked) { $('#lmsg').textContent = 'Candidate ki sahmati ka tick lagayein (Terms + data use)'; return; }
       b.disabled = true;
       try {
-        var r = await api('POST', '/api/staff/cand-save', { month: S.month, item: item, photo: f.photo && !f.photoOld ? f.photo : undefined });
+        var r = await api('POST', '/api/staff/cand-save', { month: S.month, consent: f.id ? undefined : true, item: item, photo: f.photo && !f.photoOld ? f.photo : undefined, docs: f.docs && Object.keys(f.docs).length ? f.docs : undefined });
         S.view = r.view; S.form = null; S.f = {}; S.hz = null; render(); P.toast('Save ho gaya. Serial: ' + r.serial + (f.id ? '' : '. Ab "Approve" dabayein.'));
       } catch (e) { b.disabled = false; $('#lmsg').textContent = e.message; }
     },
@@ -279,8 +294,12 @@
     var t = e.target;
     if (t.dataset && t.dataset.f === 'hzp') { S.hzParty = t.value; S.hz = null; render(); }
     else if (t.dataset && t.dataset.f) S.f[t.dataset.f] = t.value;
+    else if (t.classList.contains('doc-file') && t.files && t.files[0]) {
+      var dk = t.dataset.doc, df = t.files[0]; t.value = '';
+      try { var du = await P.photoFromFile(df, { kind: 'doc' }); S.f.docs = S.f.docs || {}; S.f.docs[dk] = du; refreshDocs(); } catch (x) { if (x.message !== 'cancel') P.toast(x.message); }
+    }
     else if (t.id === 'photoFile' && t.files && t.files[0]) {
-      try { S.f.photo = await P.photoFromFile(t.files[0]); S.f.photoOld = false; var pb = $('#pbox'); if (pb) pb.innerHTML = '<img alt="photo" src="' + esc(S.f.photo) + '">'; } catch (x) { P.toast(x.message); }
+      try { S.f.photo = await P.photoFromFile(t.files[0], { kind: 'photo' }); S.f.photoOld = false; var pb = $('#pbox'); if (pb) pb.innerHTML = '<img alt="photo" src="' + esc(S.f.photo) + '">'; } catch (x) { P.toast(x.message); }
       t.value = '';
     }
   });

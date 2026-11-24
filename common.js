@@ -71,8 +71,27 @@
     C.download(A2ZXlsx.write(rows, sheet, widths), name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   };
 
-    /* ---------- photo: file -> chhoti JPEG (dataURL). Server ko 400KB se badi nahi chahiye ---------- */
-  C.photoFromFile = function (file) {
+  /* ---------- photo / document: edit + crop + 100 KB se chhoti JPEG ----------
+   * P.photoFromFile(file, {kind:'photo'|'doc'}) -> Promise<dataURL>.  Editor me: crop (khichkar / zoom), ghumana, roshni, contrast.
+   * Save dabate hi file apne-aap 100 KB (max 100000 bytes) ke andar ho jati hai. Cancel par reject('cancel'). */
+  var MAXB = 100000;
+  C.MAX_IMG_BYTES = MAXB;
+  C.dataUrlBytes = function (u) { var i = String(u).indexOf(','); var b64 = String(u).slice(i + 1); return Math.floor(b64.length * 3 / 4) - (b64.slice(-2) === '==' ? 2 : b64.slice(-1) === '=' ? 1 : 0); };
+  C.kb = function (n) { return (Math.round(n / 102.4) / 10).toFixed(1) + ' KB'; };
+  var ASPECTS = { photo: [4, 5], doc: [1, 1.414], wide: [1.414, 1], sq: [1, 1] };
+  C.encodeUnder = function (cv, maxBytes) {
+    /* canvas ko JPEG me badal kar maxBytes ke andar le aata hai: pehle quality ghatata, phir size chhota karta */
+    var cur = cv, scale = 1;
+    for (var round = 0; round < 12; round++) {
+      var q = 0.9;
+      while (q >= 0.35) { var out = cur.toDataURL('image/jpeg', q); if (C.dataUrlBytes(out) <= maxBytes) return out; q -= 0.1; }
+      scale *= 0.85; var c2 = document.createElement('canvas'); c2.width = Math.max(40, Math.round(cv.width * scale)); c2.height = Math.max(40, Math.round(cv.height * scale));
+      var x2 = c2.getContext('2d'); x2.fillStyle = '#fff'; x2.fillRect(0, 0, c2.width, c2.height); x2.drawImage(cv, 0, 0, c2.width, c2.height); cur = c2;
+    }
+    return cur.toDataURL('image/jpeg', 0.3);
+  };
+  C.photoFromFile = function (file, opt) {
+    opt = opt || {};
     return new Promise(function (resolve, reject) {
       if (!file || !/^image\//.test(file.type)) { reject(new Error('Sirf photo (image) chunein')); return; }
       var fr = new FileReader();
@@ -80,18 +99,78 @@
       fr.onload = function () {
         var img = new Image();
         img.onerror = function () { reject(new Error('Ye photo khul nahi rahi. Dusri photo chunein.')); };
-        img.onload = function () {
-          var max = 480, k = Math.min(1, max / Math.max(img.width, img.height)), w = Math.max(1, Math.round(img.width * k)), h = Math.max(1, Math.round(img.height * k));
-          var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-          var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(img, 0, 0, w, h);
-          var q = 0.82, out = cv.toDataURL('image/jpeg', q);
-          while (out.length > 260000 && q > 0.3) { q -= 0.1; out = cv.toDataURL('image/jpeg', q); }
-          resolve(out);
-        };
+        img.onload = function () { openEditor(img, opt, resolve, reject); };
         img.src = fr.result;
       };
       fr.readAsDataURL(file);
     });
+  };
+  function openEditor(img, opt, resolve, reject) {
+    var VW = 300, kind = opt.kind === 'doc' ? 'doc' : 'photo', st = { rot: 0, zoom: 1, bri: 100, con: 100, ox: 0, oy: 0, asp: kind };
+    var ov = document.createElement('div'); ov.className = 'imged-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.innerHTML = '<div class="imged"><h3>' + (kind === 'doc' ? 'Document edit karein' : 'Photo edit karein') + '</h3>' +
+      '<p class="sm mu">Photo ko ungli / mouse se khichkar sahi jagah layein. Zoom se crop karein. Save karte hi file 100 KB ke andar ho jayegi.</p>' +
+      '<div class="imged-view"><canvas id="imgCv"></canvas></div>' +
+      '<div class="imged-row"><label>Frame <select id="imgAsp"><option value="photo">Photo (4:5)</option><option value="doc">Document (A4 khada)</option><option value="wide">Document (A4 lita)</option><option value="sq">Chauras</option></select></label></div>' +
+      '<div class="imged-row"><label>Zoom / crop <input id="imgZoom" type="range" min="100" max="400" value="100"></label><label>Roshni <input id="imgBri" type="range" min="60" max="160" value="100"></label><label>Contrast <input id="imgCon" type="range" min="60" max="180" value="100"></label></div>' +
+      '<div class="imged-row"><button type="button" class="btn sm sec" id="imgRl">↶ Ghumayein</button><button type="button" class="btn sm sec" id="imgRr">↷ Ghumayein</button><button type="button" class="btn sm sec" id="imgReset">Reset</button></div>' +
+      '<div class="sm" id="imgInfo" aria-live="polite"></div>' +
+      '<div class="imged-row"><button type="button" class="btn" id="imgSave">Save (100 KB ke andar)</button><button type="button" class="btn sec" id="imgCancel">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var $o = function (id) { return ov.querySelector('#' + id); }, cv = $o('imgCv'), cx = cv.getContext('2d');
+    $o('imgAsp').value = st.asp;
+    function dims() { var r = ASPECTS[st.asp], w = r[0] >= r[1] ? VW : Math.round(VW * r[0] / r[1] * 1.0), h = r[0] >= r[1] ? Math.round(VW * r[1] / r[0]) : VW; if (r[0] < r[1]) { w = Math.round(VW * r[0] / r[1]); h = VW; } return [w, h]; }
+    function draw(c, w, h, scaleOut) {
+      /* image ko rotate karke frame me bitha deta hai. ox, oy frame ke hisaab se (0..1) */
+      var rot = st.rot % 360, sw = (rot % 180) ? img.height : img.width, sh = (rot % 180) ? img.width : img.height;
+      var base = Math.max(w / sw, h / sh) * st.zoom, x = c.getContext('2d');
+      x.save(); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h);
+      x.filter = 'brightness(' + st.bri + '%) contrast(' + st.con + '%)';
+      var mx = Math.max(0, (sw * base - w) / 2), my = Math.max(0, (sh * base - h) / 2);
+      x.translate(w / 2 + Math.max(-mx, Math.min(mx, st.ox * w)), h / 2 + Math.max(-my, Math.min(my, st.oy * h)));
+      x.rotate(rot * Math.PI / 180); x.scale(base, base); x.drawImage(img, -img.width / 2, -img.height / 2); x.restore();
+    }
+    function paint() { var d = dims(); cv.width = d[0]; cv.height = d[1]; draw(cv, d[0], d[1]); }
+    function info() { try { var d = dims(), k = 900 / Math.max(d[0], d[1]), o = document.createElement('canvas'); o.width = Math.round(d[0] * k); o.height = Math.round(d[1] * k); draw(o, o.width, o.height); $o('imgInfo').textContent = 'Abhi file ka size: lagbhag ' + C.kb(C.dataUrlBytes(C.encodeUnder(o, MAXB))) + ' (limit 100 KB)'; } catch (e) {} }
+    var tmr = null; function upd() { paint(); clearTimeout(tmr); tmr = setTimeout(info, 250); }
+    var drag = null;
+    cv.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY, ox: st.ox, oy: st.oy }; try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
+    cv.addEventListener('pointermove', function (e) { if (!drag) return; st.ox = drag.ox + (e.clientX - drag.x) / cv.clientWidth; st.oy = drag.oy + (e.clientY - drag.y) / cv.clientHeight; paint(); });
+    var end = function () { if (drag) { drag = null; info(); } }; cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    cv.addEventListener('wheel', function (e) { e.preventDefault(); st.zoom = Math.max(1, Math.min(4, st.zoom + (e.deltaY < 0 ? .1 : -.1))); $o('imgZoom').value = Math.round(st.zoom * 100); upd(); }, { passive: false });
+    $o('imgZoom').addEventListener('input', function (e) { st.zoom = e.target.value / 100; upd(); });
+    $o('imgBri').addEventListener('input', function (e) { st.bri = +e.target.value; upd(); });
+    $o('imgCon').addEventListener('input', function (e) { st.con = +e.target.value; upd(); });
+    $o('imgAsp').addEventListener('change', function (e) { st.asp = e.target.value; st.ox = st.oy = 0; upd(); });
+    $o('imgRl').addEventListener('click', function () { st.rot = (st.rot + 270) % 360; st.ox = st.oy = 0; upd(); });
+    $o('imgRr').addEventListener('click', function () { st.rot = (st.rot + 90) % 360; st.ox = st.oy = 0; upd(); });
+    $o('imgReset').addEventListener('click', function () { st.rot = 0; st.zoom = 1; st.bri = 100; st.con = 100; st.ox = st.oy = 0; $o('imgZoom').value = 100; $o('imgBri').value = 100; $o('imgCon').value = 100; upd(); });
+    function close() { clearTimeout(tmr); ov.remove(); }
+    $o('imgCancel').addEventListener('click', function () { close(); reject(new Error('cancel')); });
+    $o('imgSave').addEventListener('click', function () {
+      try {
+        var d = dims(), k = (kind === 'doc' || st.asp !== 'photo' ? 1100 : 640) / Math.max(d[0], d[1]), o = document.createElement('canvas'); o.width = Math.round(d[0] * k); o.height = Math.round(d[1] * k); draw(o, o.width, o.height);
+        var out = C.encodeUnder(o, MAXB); close(); resolve(out);
+      } catch (e) { close(); reject(new Error('Photo save nahi ho pai. Dusri photo chunein.')); }
+    });
+    paint(); info();
+  }
+  /* documents ke 4 khane (Aadhaar aage / peeche, bank passbook, anya) */
+  C.DOCS = [['aadhaar', 'Aadhaar (aage)'], ['aadhaarBack', 'Aadhaar (peeche)'], ['bank', 'Bank passbook / cheque'], ['other', 'Anya document']];
+  C.docSlots = function (have, pending, canView) {
+    have = have || []; pending = pending || {};
+    return '<div class="docslots span-all"><b>Documents (photo khinch kar ya file se; har file 100 KB ke andar apne-aap)</b><div class="docgrid">' + C.DOCS.map(function (d) {
+      var k = d[0], isNew = !!pending[k], saved = have.indexOf(k) >= 0;
+      return '<div class="doccard"><div class="b">' + C.esc(d[1]) + '</div><div class="sm ' + (isNew || saved ? 'ok' : 'mu') + '">' + (isNew ? 'Naya chuna (' + C.kb(C.dataUrlBytes(pending[k])) + ')' : saved ? 'Save hai' : 'Khali') + '</div>' +
+        '<label class="btn sec sm file-btn mt6">' + (isNew || saved ? 'Badlein' : 'Chunein') + '<input type="file" accept="image/*" class="hide doc-file" data-doc="' + k + '"></label>' +
+        (isNew ? ' <button type="button" class="link" data-act="docpend" data-doc="' + k + '">Dekhein</button>' : saved && canView ? ' <button type="button" class="link" data-act="docview" data-doc="' + k + '">Dekhein</button>' : '') +
+        (isNew ? ' <button type="button" class="link danger" data-act="docdrop" data-doc="' + k + '">Hatayein</button>' : '') + '</div>';
+    }).join('') + '</div></div>';
+  };
+  C.viewImage = function (url, title) {
+    var ov = document.createElement('div'); ov.className = 'imged-ov'; ov.setAttribute('role', 'dialog');
+    ov.innerHTML = '<div class="imged"><h3>' + C.esc(title || 'Document') + '</h3><div class="imged-view"><img id="viewImg" alt="document"></div><div class="imged-row"><button type="button" class="btn sec" id="viewClose">Band karein</button></div></div>';
+    ov.querySelector('#viewImg').src = url; ov.querySelector('#viewClose').addEventListener('click', function () { ov.remove(); }); document.body.appendChild(ov);
   };
 
   /* ---------- ID card (PNG): staff ya candidate. o = {kind, serial, name, role, mobile, lines:[..], photo, joined} ---------- */

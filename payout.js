@@ -13,7 +13,11 @@
  *   margin            = bill - wage
  *   company bonus     = bill x party bill %            (e.g. 5% of total bill)
  *   pool              = margin + bonus
- *   staff commission  = pool x staff %                 (e.g. 40%)
+ *   staff commission  = depends on the option the admin chose for that staff (commMode):
+ *       percent -> pool x staff %            (e.g. 40%)
+ *       fixed   -> fixed rupees per candidate per day, trade by trade (e.g. fitter 200, welder 150)
+ *       none    -> no share (admin's own candidates; admin alone decides rate and agreement)
+ *       (blank) -> not chosen yet: 0 and a warning, nothing is assumed
  *   GST on commission = commission x GST %             (deducted from the staff)
  *   firm share        = pool - staff commission
  *   GST on firm share = firm share x firm GST %
@@ -50,6 +54,13 @@
   }
   function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); }
 
+  /* commission option of a staff: percent | fixed | none | '' (not chosen yet) */
+  function modeOf(st) { var m = st && st.commMode; return (m === 'percent' || m === 'fixed' || m === 'none') ? m : ''; }
+  function findFixed(st, trade) {
+    var t = norm(trade), list = (st && st.fixedRates) || [];
+    for (var i = 0; i < list.length; i++) if (norm(list[i].trade) === t && has(list[i].rate)) return nn(list[i].rate);
+    return null;
+  }
   function findRate(party, trade) {
     var t = norm(trade), list = (party && party.rates) || [];
     for (var i = 0; i < list.length; i++) if (norm(list[i].trade) === t) return list[i];
@@ -83,7 +94,7 @@
     parties.forEach(function (p) { pById[p.id] = p; });
     staff.forEach(function (s) { sById[s.id] = s; });
 
-    var warnings = [], lines = [];
+    var warnings = [], lines = [], modeWarned = {};
     cands.forEach(function (c) {
       var party = pById[c.partyId];
       if (!party) { warnings.push({ kind: 'party', msg: c.name + ': party not found' }); return; }
@@ -99,8 +110,15 @@
       var bill = r2(billRate * f), pay = r2(payRate * f), margin = r2(bill - pay);
       var billPct = has(party.billPct) ? Math.min(nn(party.billPct), 100) : S.billPct;
       var bonus = r2(bill * billPct / 100), pool = r2(margin + bonus);
-      var pct = st ? (has(st.commissionPct) ? Math.min(nn(st.commissionPct), 100) : S.commissionPct) : 0;
-      var comm = r2(Math.max(pool, 0) * pct / 100), gst = r2(comm * S.gstPct / 100), net = r2(comm - gst);
+      var mode = st ? modeOf(st) : 'direct', pct = 0, fixedRate = null, comm = 0;
+      if (mode === 'percent') { pct = has(st.commissionPct) ? Math.min(nn(st.commissionPct), 100) : S.commissionPct; comm = r2(Math.max(pool, 0) * pct / 100); }
+      else if (mode === 'fixed') {
+        fixedRate = findFixed(st, c.trade);
+        comm = fixedRate == null ? 0 : r2(fixedRate * f);
+        if (days > 0 && fixedRate == null) warnings.push({ kind: 'fixedrate', id: c.id, msg: st.name + ': "' + c.trade + '" ka fixed rate tay nahi hai (' + c.name + ')' });
+        if (days > 0 && comm > Math.max(pool, 0) + 0.004) warnings.push({ kind: 'commhigh', id: c.id, msg: c.name + ': fixed commission pool se zyada hai (firm ko ghata)' });
+      } else if (mode === '' && st && !modeWarned[st.id]) { modeWarned[st.id] = 1; warnings.push({ kind: 'commmode', id: st.id, msg: st.name + ': commission ka option (percent / fixed / koi nahi) abhi chuna nahi gaya, isliye commission 0 hai' }); }
+      var gst = r2(comm * S.gstPct / 100), net = r2(comm - gst);
       if (days > 0 && !card && !(has(c.billRate) && has(c.payRate))) warnings.push({ kind: 'rate', id: c.id, msg: c.name + ' (' + c.trade + ', ' + party.name + '): rate card me rate nahi hai' });
       if (days > 31) warnings.push({ kind: 'days', id: c.id, msg: c.name + ': ' + days + ' din, 31 se zyada' });
       if (days > 0 && payRate > billRate) warnings.push({ kind: 'loss', id: c.id, msg: c.name + ': wage company rate se zyada hai' });
@@ -108,7 +126,7 @@
         id: c.id, name: c.name, trade: c.trade, partyId: c.partyId, partyName: party.name, staffId: c.staffId || null,
         staffName: st ? st.name : '', active: active, days: days, basis: basis, billRate: billRate, payRate: payRate,
         bill: bill, pay: pay, margin: margin, billPct: billPct, bonus: bonus, pool: pool,
-        pct: pct, commission: comm, gst: gst, net: net
+        commMode: mode, fixedRate: fixedRate, pct: pct, commission: comm, gst: gst, net: net
       });
     });
 
@@ -138,13 +156,26 @@
       };
     });
 
+    /* staff ke candidate kin kin party me hain, party-wise commission ke saath */
+    function partiesOf(sl) {
+      var m = {}, order = [];
+      sl.forEach(function (l) {
+        var q = m[l.partyId] || (m[l.partyId] = { partyId: l.partyId, partyName: l.partyName, candidates: 0, days: 0, pay: 0, pool: 0, commission: 0, gst: 0, net: 0 }); if (order.indexOf(l.partyId) < 0) order.push(l.partyId);
+        if (l.active) q.candidates++;
+        q.days = r2(q.days + l.days); q.pay = r2(q.pay + l.pay); q.pool = r2(q.pool + l.pool); q.commission = r2(q.commission + l.commission); q.gst = r2(q.gst + l.gst); q.net = r2(q.net + l.net);
+      });
+      return order.map(function (k) { return m[k]; });
+    }
+
     /* ---- by staff ---- */
     var byStaff = staff.map(function (s) {
       var sl = lines.filter(function (l) { return l.staffId === s.id; });
       var fixed = fixedPayFor(s, month);
       return {
         id: s.id, name: s.name, type: s.type || 'agent',
-        pct: has(s.commissionPct) ? Math.min(nn(s.commissionPct), 100) : S.commissionPct,
+        commMode: modeOf(s), pct: modeOf(s) === 'percent' ? (has(s.commissionPct) ? Math.min(nn(s.commissionPct), 100) : S.commissionPct) : 0,
+        fixedRates: modeOf(s) === 'fixed' ? (s.fixedRates || []).map(function (x) { return { trade: x.trade, rate: nn(x.rate) }; }) : [],
+        parties: partiesOf(sl),
         candidates: sl.filter(function (l) { return l.active; }).length, days: sum(sl, function (l) { return l.days; }),
         pay: sum(sl, function (l) { return l.pay; }), bill: sum(sl, function (l) { return l.bill; }),
         margin: sum(sl, function (l) { return l.margin; }), bonus: sum(sl, function (l) { return l.bonus; }),
@@ -180,6 +211,7 @@
   }
 
   function fixedPayFor(s, month) {
+    if (s.type === 'supplier') return 0;   // manpower supplier ko payment/salary nahi, sirf commission
     var f = nn(s.fixedPay, 0);
     if (!f || s.active === false) return 0;
     if (s.fixedFrom && /^\d{4}-\d{2}$/.test(s.fixedFrom) && s.fixedFrom > month) return 0;
@@ -187,6 +219,6 @@
     return f;
   }
 
-  return { DEFAULTS: DEFAULTS, compute: compute, r2: r2, sum: sum, norm: norm, splitByWeight: splitByWeight, validMonth: validMonth, monthEnd: monthEnd, addDays: addDays, findRate: findRate, fixedPayFor: fixedPayFor };
+  return { DEFAULTS: DEFAULTS, compute: compute, r2: r2, sum: sum, norm: norm, splitByWeight: splitByWeight, validMonth: validMonth, monthEnd: monthEnd, addDays: addDays, findRate: findRate, modeOf: modeOf, findFixed: findFixed, fixedPayFor: fixedPayFor };
 });
 

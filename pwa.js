@@ -35,6 +35,44 @@
 (function () {
   'use strict';
   try { if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {}
+  /* ---- Update ka message: naya sw.js aate hi "Naya update aaya hai" bar dikhti hai ---- */
+  (function () {
+    if (!('serviceWorker' in navigator)) return;
+    var reloading = false, clicked = false, bar = null, ver = '';
+    function showBar(reg) {
+      if (bar || !reg || !reg.waiting) return;
+      bar = document.createElement('div'); bar.className = 'update-bar'; bar.setAttribute('role', 'alert'); bar.id = 'updateBar';
+      var t = document.createElement('span'); t.textContent = 'Naya update aaya hai. Click karke update karein.';
+      var go = document.createElement('button'); go.type = 'button'; go.id = 'updateNow'; go.textContent = 'Abhi update karein';
+      var x = document.createElement('button'); x.type = 'button'; x.className = 'ub-x'; x.textContent = 'Baad me';
+      go.addEventListener('click', function () { clicked = true; go.disabled = true; go.textContent = 'Update ho raha hai...'; try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {} setTimeout(function () { location.reload(); }, 4000); });
+      x.addEventListener('click', function () { if (bar) { bar.remove(); bar = null; } });
+      bar.appendChild(t); bar.appendChild(go); bar.appendChild(x); document.body.appendChild(bar);
+    }
+    function watch(reg) {
+      if (reg.waiting && navigator.serviceWorker.controller) showBar(reg);
+      reg.addEventListener('updatefound', function () {
+        var nw = reg.installing; if (!nw) return;
+        nw.addEventListener('statechange', function () { if (nw.state === 'installed' && navigator.serviceWorker.controller) showBar(reg); });
+      });
+      function chk() { try { reg.update().catch(function () {}); } catch (e) {} }
+      setInterval(chk, 30 * 60 * 1000);
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) chk(); });
+      window.addEventListener('focus', chk);
+      chk();
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', function () { if (reloading || !clicked) return; reloading = true; location.reload(); });
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'VERSION') { ver = e.data.version; var v = document.getElementById('verTag'); if (v) v.textContent = ver; }
+    });
+    function tag() {
+      if (document.getElementById('verTag') || !document.body) return;
+      var v = document.createElement('div'); v.id = 'verTag'; v.className = 'ver-tag'; v.textContent = ver; document.body.appendChild(v);
+      try { if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'VERSION' }); } catch (e) {}
+    }
+    navigator.serviceWorker.ready.then(function (reg) { watch(reg); tag(); try { if (reg.active) reg.active.postMessage({ type: 'VERSION' }); } catch (e) {} }).catch(function () {});
+    window.__a2zShowUpdate = showBar;
+  })();
   var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   if (standalone) return;
   function skipped() { try { return localStorage.getItem('a2z_pwa_skip') === '1'; } catch (e) { return false; } }
