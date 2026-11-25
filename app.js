@@ -163,7 +163,7 @@ V.contact=function(){
   '<div class="row"><button class="btn" type="submit">Prepare request</button></div><div id="quoteOut"></div></form></section>';
 };
 FORMS.quote=function(f,fd){
-  var q={id:uid(),date:new Date().toISOString().slice(0,10),name:fd.get('name'),phone:fd.get('phone'),work:fd.get('work'),msg:fd.get('msg')};
+  var q={id:uid(),date:new Date(Date.now()+330*60000).toISOString().slice(0,10),name:fd.get('name'),phone:fd.get('phone'),work:fd.get('work'),msg:fd.get('msg')};
   DB.enquiries.unshift(q);save();
   var text='Quote request for A2Z Build Tech\nName: '+q.name+'\nPhone: '+q.phone+'\nWork: '+q.work+'\nDetails: '+q.msg;
   $('#quoteOut').innerHTML='<div class="note">Your request is saved on this device. To send it, copy the text below and share it with us by phone or message.</div><pre class="doc" id="quoteText">'+esc(text)+'</pre><div class="row"><button class="btn sec" type="button" data-act="copy" data-t="#quoteText">Copy request</button></div>';
@@ -267,7 +267,7 @@ LIVE.bill=billOut;
 
 var agrVals=null;
 function agrDefaults(){
-  return {type:'manpower',party:'',addr:'',gstin:'',site:'',start:new Date().toISOString().slice(0,10),months:6,cycle:15,adv:0,ret:5,gst:18,tds:2,otm:2,notice:15,court:'Maihar, Madhya Pradesh',
+  return {type:'manpower',party:'',addr:'',gstin:'',site:'',start:new Date(Date.now()+330*60000).toISOString().slice(0,10),months:6,cycle:15,adv:0,ret:5,gst:18,tds:2,otm:2,notice:15,court:'Maihar, Madhya Pradesh',
     rates:DB.labour.map(function(x){return x.name+': '+inr(x.rate)+' per day'}).join('\n')};
 }
 AD.agreement=function(){
