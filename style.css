@@ -99,7 +99,7 @@ footer{border-top:1px solid var(--ln);background:var(--sf);padding-block:20px;co
 [hidden]{display:none!important}
 
 .imged-ov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:grid;place-items:center;padding:12px;overflow:auto}
-.imged{background:var(--bg,#fff);color:var(--tx,#111);border-radius:12px;padding:14px;max-width:420px;width:100%;display:grid;gap:10px}
+.imged{background:var(--bg,#fff);color:var(--fg,var(--tx,#111));border-radius:12px;padding:14px;max-width:420px;width:100%;display:grid;gap:10px}
 .imged-view{display:grid;place-items:center;background:#eee;border-radius:8px;padding:6px}
 .imged-view canvas{max-width:100%;touch-action:none;cursor:grab;background:#fff}
 .imged-view img{max-width:100%;max-height:70vh}
@@ -124,4 +124,4 @@ body.busy{cursor:progress}
 @media (prefers-reduced-motion:reduce){.pressed,.busybar{animation:none}}
 .donebox{text-align:center}.done-tick{width:54px;height:54px;border-radius:50%;background:#16a34a;color:#fff;font-size:34px;line-height:54px;margin:0 auto;animation:a2zpop .35s ease-out}
 @keyframes a2zpop{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
-.donetbl{width:100%;text-align:left;border-collapse:collapse;font-size:14px}.donetbl th{width:42%;font-weight:600;opacity:.75;padding:4px 6px;vertical-align:top}.donetbl td{padding:4px 6px;word-break:break-word}.donetbl tr{border-bottom:1px solid #8883}
+.donetbl{width:100%;text-align:left;border-collapse:collapse;font-size:14px}.donetbl th{border-bottom:0;white-space:normal;width:42%;font-weight:600;opacity:.75;padding:4px 6px;vertical-align:top}.donetbl td{padding:4px 6px;word-break:break-word}.donetbl tr{border-bottom:1px solid #8883}
