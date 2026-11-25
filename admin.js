@@ -186,17 +186,29 @@
       '<tr class="tot"><td colspan="3">Kul</td><td class="n">' + nf(tot.days) + '</td><td class="n">' + inr(tot.pay) + '</td><td class="n">' + inr(tot.pool) + '</td><td class="n">' + inr(tot.commission) + '</td><td class="n">' + inr(tot.gst) + '</td><td class="n">' + inr(tot.net) + '</td></tr></tbody></table></div>';
   }
 
-  V.cands = function () {
-    var d = S.data, f = S.f, byId = {}; d.report.lines.forEach(function (l) { byId[l.id] = l; });
-    var q = f.q.toLowerCase();
-    var list = d.candidates.filter(function (c) { return (!f.party || c.partyId === f.party) && (!f.staff || (f.staff === '_direct' ? !c.staffId : c.staffId === f.staff)) && (!q || (c.name + ' ' + c.mobile + ' ' + c.trade + ' ' + c.serial).toLowerCase().indexOf(q) >= 0); });
-    var h = '<div class="row between"><h2>Candidates (' + list.length + ')</h2><div class="row"><button class="btn sec" data-act="xcands">Excel</button><button class="btn" data-act="panel" data-k="cand">+ Naya candidate</button></div></div>' +
-      '<div class="grid">' + sel('fparty', 'Party', partyOpts('Sab party'), f.party) + sel('fstaff', 'Staff', [['', 'Sab staff'], ['_direct', 'Direct (koi staff nahi)']].concat(S.data.staff.map(function (s) { return [s.id, s.name]; })), f.staff) + fld('fq', 'Khojein (naam, mobile, trade, serial)', f.q) + '</div>';
-    h += '<div class="card scroll"><table><thead><tr><th>Serial</th><th>Naam</th><th>Mobile</th><th>Trade</th><th>Party</th><th>Staff</th><th>Joining</th><th>Entry (date, time)</th><th>Din</th><th>Status</th><th></th></tr></thead><tbody>' +
+  /* khoj tez rahe: har candidate ka lowercase text ek baar banta hai (cache), aur type karte waqt sirf neeche ki table badalti hai */
+  function candList() {
+    var f = S.f, q = f.q.toLowerCase().trim();
+    return S.data.candidates.filter(function (c) {
+      if (f.party && c.partyId !== f.party) return false;
+      if (f.staff && (f.staff === '_direct' ? c.staffId : c.staffId !== f.staff)) return false;
+      if (!q) return true;
+      var hs = c._h || (c._h = (c.name + ' ' + c.mobile + ' ' + c.trade + ' ' + c.serial).toLowerCase());
+      return hs.indexOf(q) >= 0;
+    });
+  }
+  function candTable(list) {
+    var byId = {}; S.data.report.lines.forEach(function (l) { byId[l.id] = l; });
+    return '<div class="card scroll"><table><thead><tr><th>Serial</th><th>Naam</th><th>Mobile</th><th>Trade</th><th>Party</th><th>Staff</th><th>Joining</th><th>Entry (date, time)</th><th>Din</th><th>Status</th><th></th></tr></thead><tbody>' +
       (list.slice(0, 400).map(function (c) {
         var l = byId[c.id] || {}; return '<tr><td class="b">' + esc(c.serial) + '</td><td>' + esc(c.name) + ' ' + aprBtn(c.approval) + '</td><td>' + esc(c.mobile) + '</td><td>' + esc(c.trade) + '</td><td>' + esc(l.partyName || '') + '</td><td>' + esc(whoS(l.staffId, l.staffName)) + '</td><td>' + esc(P.dd(c.joinDate)) + '</td><td class="sm">' + esc(P.dt(c.createdAt)) + '<div class="xs mu">' + (c.source === 'staff' ? 'Staff link se' : 'Admin') + '</div></td><td><input class="w-days js-days" data-id="' + c.id + '" type="number" min="0" max="31" step="0.5" value="' + dayOf(c.id) + '" aria-label="Din"></td><td>' + (c.status === 'left' ? '<span class="pill">chhod diya</span>' : '<span class="pill good">chal raha</span>') + ' ' + (c.verified ? '' : '<button class="link js-verify" data-act="verify" data-id="' + c.id + '">Verify</button>') + '</td><td class="row"><button class="link" data-act="candid" data-id="' + c.id + '">ID card</button><button class="link" data-act="panel" data-k="cand" data-id="' + c.id + '">Edit</button><button class="link danger" data-act="del" data-col="candidates" data-id="' + c.id + '">Hatayein</button></td></tr>';
       }).join('') || '<tr><td colspan="11" class="mu">Koi candidate nahi mila.</td></tr>') + '</tbody></table></div>';
-    return h;
+  };
+  V.cands = function () {
+    var f = S.f, list = candList();
+    var h = '<div class="row between"><h2>Candidates (<span id="candN">' + list.length + '</span>)</h2><div class="row"><button class="btn sec" data-act="xcands">Excel</button><button class="btn" data-act="panel" data-k="cand">+ Naya candidate</button></div></div>' +
+      '<div class="grid">' + sel('fparty', 'Party', partyOpts('Sab party'), f.party) + sel('fstaff', 'Staff', [['', 'Sab staff'], ['_direct', 'Direct (koi staff nahi)']].concat(S.data.staff.map(function (s) { return [s.id, s.name]; })), f.staff) + fld('fq', 'Khojein (naam, mobile, trade, serial)', f.q) + '</div>';
+    return h + '<div id="candRes">' + candTable(list) + '</div>';
   };
 
 
@@ -720,7 +732,16 @@
       ['GST firm ke hisse par', f.gstOnFirm], ['Site supervisor fixed', f.fixedPay], ['Office salary', f.officeSalaries], ['Anya kharch', f.otherExpenses], ['Teeno me baantne ke liye bacha', f.distributable]]
       .concat(r.owners.map(function (o) { return [o.name + ' (' + o.role + ')', o.amount]; }));
   }
-  function xbook(sheets, name) { P.download(A2ZXlsx.writeBook(sheets), name + '-' + S.month + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
+  /* Standard company format: har sheet par company naam, heading, period, total aur signature */
+  var XT = { 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
+    'Company-wise': 'Party-wise Billing Summary', 'Payment kram': 'Payment Sequence Statement', 'Owners ka hissa': 'Owners Profit Share Statement', 'Party-wise hisaab': 'Party-wise Account Statement', 'Staff-wise hisaab': 'Staff-wise Account Statement',
+    'Aaya-gaya': 'Cash Inflow & Outflow Statement', 'Chukaya (paid)': 'Payments Made Statement', 'Payment record': 'Payment Register', 'Advance': 'Advance Register', 'Kharch': 'Expense Register', 'Supplier': 'Manpower Supplier Statement',
+    'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Din-wise ginti': 'Day-wise Man-days Summary' };
+  var XNT = { 'Payment kram': 1, 'Staff-wise hisaab': 1, 'Owners ka hissa': 1, 'Aaya-gaya': 1, 'Suraksha alerts': 1, 'Party': 1, 'Candidates': 1, 'Staff': 1, 'Supplier': 1 };
+  function xbook(sheets, name) {
+    var meta = { period: P.monthName(S.month) };
+    sheets = sheets.map(function (sh) { return { name: sh.name, rows: sh.rows, widths: sh.widths, title: sh.title || XT[sh.name] || sh.name, total: XNT[sh.name] ? false : sh.total }; });
+    P.download(A2ZXlsx.writeBook(sheets, meta), name + '-' + S.month + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
 
   /* ---------- events ---------- */
   function docRefresh() { var el = document.querySelector('.docslots'); if (el && S.panel) { var rec = S.panel.k === 'staff' ? staff(S.panel.id) : cand(S.panel.id); el.outerHTML = P.docSlots(S.panel.id && rec ? rec.docKeys : [], S.pdocs, !!S.panel.id); } }
@@ -800,8 +821,8 @@
     logcall: async function (b) { await api('POST', '/api/admin/reminder', { partyId: b.dataset.id, month: S.month, channel: 'call' }); S.panel = null; await load(); P.toast('Note kar liya'); },
     sendmail: async function (b) { await api('POST', '/api/admin/reminder', { partyId: b.dataset.id, month: S.month, channel: 'email', message: $('#remText').value }); S.panel = null; await load(); P.toast('Email bhej diya'); },
     backup: async function () { var r = await api('POST', '/api/admin/backup', {}); P.download(JSON.stringify(r.data, null, 1), r.name, 'application/json'); P.toast('Backup download ho gaya'); },
-    xparty: function (b) { var ls = S.data.report.lines.filter(function (l) { return l.partyId === b.dataset.id; }); P.xlsxDownload(exportRows(ls, false), 'party-' + S.month + '.xlsx', 'Party', XW); },
-    xstaff: function (b) { var ls = S.data.report.lines.filter(function (l) { return l.staffId === b.dataset.id; }); P.xlsxDownload(exportRows(ls, true), 'staff-' + S.month + '.xlsx', 'Staff', XW); },
+    xparty: function (b) { var ls = S.data.report.lines.filter(function (l) { return l.partyId === b.dataset.id; }); P.xlsxDownload(exportRows(ls, false), 'party-' + S.month + '.xlsx', 'Party', XW, 'Party-wise Candidate Statement', P.monthName(S.month)); },
+    xstaff: function (b) { var ls = S.data.report.lines.filter(function (l) { return l.staffId === b.dataset.id; }); P.xlsxDownload(exportRows(ls, true), 'staff-' + S.month + '.xlsx', 'Staff', XW, 'Staff-wise Candidate Statement', P.monthName(S.month)); },
     xall: function () { xbook(allSheets(), 'A2Z-sab-hisaab'); },
     xowners: function () { xbook([{ name: 'Owners ka hissa', rows: ownersRows(), widths: [46, 16] }], 'A2Z-owners'); },
     xparties: function () {
@@ -862,9 +883,12 @@
     } else if (t.name === 'fparty') { S.f.party = t.value; render(); } else if (t.name === 'fstaff') { S.f.staff = t.value; render(); } else if (t.name === 'hzp') { S.hzParty = t.value; S.hz = null; render(); }
   });
   document.addEventListener('input', function (e) {
-    if (e.target && e.target.id === 'idq') { S.idq = e.target.value; var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); return; }
+    if (e.target && e.target.id === 'idq') { S.idq = e.target.value; clearTimeout(S.idT); S.idT = setTimeout(function () { var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); }, 100); return; }
     var t = e.target;
-    if (t.id === 'fq') { S.f.q = t.value; render(); }
+    if (t.id === 'fq') {
+      S.f.q = t.value; clearTimeout(S.fqT);
+      S.fqT = setTimeout(function () { var rs = $('#candRes'); if (!rs || S.tab !== 'cands') { render(); return; } var l = candList(); rs.innerHTML = candTable(l); var n = $('#candN'); if (n) n.textContent = l.length; }, 120);
+    }
     if (t.id === 'remText') { var a = $('#waBtn'); if (a && S.panel) { var p = party(S.panel.id); a.href = P.waLink(p.phone, t.value); } }
   });
   $('#month').addEventListener('change', function (e) { if (/^\d{4}-\d{2}$/.test(e.target.value)) { S.month = e.target.value; guard(load)(); } });

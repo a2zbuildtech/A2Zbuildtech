@@ -107,18 +107,22 @@
   }
 
   /* ---------- Candidates ---------- */
-  function candsView() {
-    if (S.form) return candForm();
-    var q = S.q.toLowerCase(), list = S.view.candidates.filter(function (c) { return !q || (c.name + ' ' + c.serial + ' ' + c.mobile + ' ' + c.trade + ' ' + c.partyName).toLowerCase().indexOf(q) >= 0; });
-    return '<div class="row between"><h2>Mere candidates (' + S.view.candidates.length + ')</h2><button class="btn" data-act="newcand">+ Naya candidate (admission form)</button></div>' +
-      '<div class="row"><label class="grow">Khojein (naam / serial number / mobile)<input id="q" value="' + esc(S.q) + '" placeholder="jaise A2Z-C-00012"></label></div>' +
-      (S.rq ? rateForm() : '') +
-      '<div class="card scroll"><table><thead><tr><th>Serial</th><th>Naam</th><th>Party</th><th>Trade</th><th class="n">Rate' + unit() + '</th><th>Halat</th><th></th></tr></thead><tbody>' +
+  /* khoj tez rahe: lowercase text ek baar cache hota hai; type karte waqt sirf table badalti hai */
+  function candTable(qs) {
+    var q = String(qs || '').toLowerCase().trim(), list = S.view.candidates.filter(function (c) { if (!q) return true; var hs = c._h || (c._h = (c.name + ' ' + c.serial + ' ' + c.mobile + ' ' + c.trade + ' ' + c.partyName).toLowerCase()); return hs.indexOf(q) >= 0; });
+    return '<div class="card scroll"><table><thead><tr><th>Serial</th><th>Naam</th><th>Party</th><th>Trade</th><th class="n">Rate' + unit() + '</th><th>Halat</th><th></th></tr></thead><tbody>' +
       (list.map(function (c) {
         return '<tr><td class="b">' + esc(c.serial) + '</td><td>' + esc(c.name) + (c.status === 'left' ? ' <span class="pill">chhod diya</span>' : '') + '<div class="xs mu">' + esc(c.mobile) + '</div></td><td>' + esc(c.partyName) + '</td><td>' + esc(c.trade) + '</td><td class="n">' + inr(c.payRate) + '</td><td>' + approvalPill(c.approval) + '</td><td class="noprint"><div class="row">' +
           '<button class="link" data-act="editcand" data-id="' + c.id + '">Badlein</button>' + (c.approval === 'pending' ? '<button class="link" data-act="approvecand" data-id="' + c.id + '">Approve</button>' : '') +
           '<button class="link" data-act="candid" data-id="' + c.id + '">ID card</button><button class="link" data-act="ratereq" data-id="' + c.id + '">Rate request</button></div></td></tr>';
-      }).join('') || '<tr><td colspan="7" class="mu">Koi candidate nahi mila. "+ Naya candidate" se admission form bharein.</td></tr>') + '</tbody></table></div>' +
+      }).join('') || '<tr><td colspan="7" class="mu">Koi candidate nahi mila. "+ Naya candidate" se admission form bharein.</td></tr>') + '</tbody></table></div>';
+  }
+  function candsView() {
+    if (S.form) return candForm();
+    return '<div class="row between"><h2>Mere candidates (' + S.view.candidates.length + ')</h2><button class="btn" data-act="newcand">+ Naya candidate (admission form)</button></div>' +
+      '<div class="row"><label class="grow">Khojein (naam / serial number / mobile)<input id="q" value="' + esc(S.q) + '" placeholder="jaise A2Z-C-00012"></label></div>' +
+      (S.rq ? rateForm() : '') +
+      '<div id="candRes">' + candTable(S.q) + '</div>' +
       (S.view.requests.length ? '<h3>Rate requests</h3><div class="card scroll"><table><thead><tr><th>Candidate</th><th class="n">Naya rate</th><th>Karan</th><th>Halat</th></tr></thead><tbody>' + S.view.requests.map(function (r) {
         var c = S.view.candidates.filter(function (x) { return x.id === r.candId; })[0] || {};
         return '<tr><td>' + esc(c.name || '') + ' <span class="xs mu">' + esc(c.serial || '') + '</span></td><td class="n">' + inr(r.payRate) + '</td><td>' + esc(r.note) + '</td><td>' + (r.status === 'approved' ? '<span class="pill good">admin ne manjoor kiya</span>' : r.status === 'rejected' ? '<span class="pill bad">admin ne mana kiya</span>' : '<span class="pill warn">admin approval baaki</span>') + '</td></tr>';
@@ -302,9 +306,9 @@
   });
   document.addEventListener('input', function (e) {
     var t = e.target;
-    if (t.id === 'idq') { S.idq = t.value; var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); return; }
+    if (t.id === 'idq') { S.idq = t.value; clearTimeout(S.idT); S.idT = setTimeout(function () { var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); }, 100); return; }
     if (t.dataset && t.dataset.f) S.f[t.dataset.f] = t.value;
-    else if (t.id === 'q') { S.q = t.value; var pos = t.selectionStart; render(); var q = $('#q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
+    else if (t.id === 'q') { S.q = t.value; clearTimeout(S.qT); S.qT = setTimeout(function () { var rs = $('#candRes'); if (rs) rs.innerHTML = candTable(S.q); }, 120); }
   });
   document.addEventListener('change', async function (e) {
     var t = e.target;

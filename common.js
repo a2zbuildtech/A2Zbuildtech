@@ -99,8 +99,8 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
   };
-  C.xlsxDownload = function (rows, name, sheet, widths) {
-    C.download(A2ZXlsx.write(rows, sheet, widths), name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  C.xlsxDownload = function (rows, name, sheet, widths, title, period) {
+    C.download(A2ZXlsx.writeBook([{ name: sheet, rows: rows, widths: widths, title: title }], { period: period || '' }), name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   };
 
   /* ---------- photo / document: edit + crop + 100 KB se chhoti JPEG ----------
