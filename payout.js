@@ -94,7 +94,7 @@
     parties.forEach(function (p) { pById[p.id] = p; });
     staff.forEach(function (s) { sById[s.id] = s; });
 
-    var warnings = [], lines = [], modeWarned = {};
+    var warnings = [], lines = [], modeWarned = {}, commToWarned = {};
     cands.forEach(function (c) {
       var party = pById[c.partyId];
       if (!party) { warnings.push({ kind: 'party', msg: c.name + ': party not found' }); return; }
@@ -111,7 +111,11 @@
       var billPct = has(party.billPct) ? Math.min(nn(party.billPct), 100) : S.billPct;
       var bonus = r2(bill * billPct / 100), pool = r2(margin + bonus);
       var mode = st ? modeOf(st) : 'direct', pct = 0, fixedRate = null, comm = 0;
-      if (mode === 'percent') { pct = has(st.commissionPct) ? Math.min(nn(st.commissionPct), 100) : S.commissionPct; comm = r2(Math.max(pool, 0) * pct / 100); }
+      /* party-wise commission: party.commTo = [staff id...] (admin ne chuna). Jo staff list me nahi, use is party se commission nahi jata. commTo tay nahi (purani party) = pehle jaisa, par chetavani. */
+      var restricted = Array.isArray(party.commTo), blocked = !!(st && restricted && party.commTo.indexOf(st.id) < 0);
+      if (st && !restricted && !commToWarned[party.id]) { commToWarned[party.id] = 1; warnings.push({ kind: 'commto', id: party.id, msg: party.name + ': is party ka commission kis staff ko jaye ye tay nahi hai (abhi sabko ja raha hai)' }); }
+      if (blocked) { /* commission nahi: poora pool firm ka */ }
+      else if (mode === 'percent') { pct = has(st.commissionPct) ? Math.min(nn(st.commissionPct), 100) : S.commissionPct; comm = r2(Math.max(pool, 0) * pct / 100); }
       else if (mode === 'fixed') {
         fixedRate = findFixed(st, c.trade);
         comm = fixedRate == null ? 0 : r2(fixedRate * f);
@@ -126,7 +130,7 @@
         id: c.id, name: c.name, trade: c.trade, partyId: c.partyId, partyName: party.name, staffId: c.staffId || null,
         staffName: st ? st.name : '', active: active, days: days, basis: basis, billRate: billRate, payRate: payRate,
         bill: bill, pay: pay, margin: margin, billPct: billPct, bonus: bonus, pool: pool,
-        commMode: mode, fixedRate: fixedRate, pct: pct, commission: comm, gst: gst, net: net
+        commMode: mode, fixedRate: fixedRate, pct: pct, commission: comm, gst: gst, net: net, commBlocked: blocked
       });
     });
 

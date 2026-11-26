@@ -3,8 +3,8 @@
 (function () {
   'use strict';
   var $ = P.$, $$ = P.$$, esc = P.esc, inr = P.inr, nf = P.nf, api = P.api;
-  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {} };
-  var TABS = [['dash', 'Overview'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
+  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {} };
+  var TABS = [['dash', 'Overview'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
   var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
   var CMODE = { percent: 'Percent (%)', fixed: 'Fixed rate (trade-wise)', none: 'Koi hissa nahi (admin tay karega)' };
   function cmLabel(x) {
@@ -136,6 +136,45 @@
   };
   function kpi(l, v) { return '<div class="card"><span class="lbl">' + esc(l) + '</span><span class="kpi">' + v + '</span></div>'; }
 
+  /* ---------- Duty / Location ---------- */
+  var dutyT = null;
+  V.duty = function () {
+    if (!dutyT) dutyT = setInterval(function () { if (S.tab === 'duty' && !document.hidden && S.data && !S.dstate.close) load().catch(function () {}); }, 60000);
+    return window.A2ZDuty.adminHtml(S.data.duty || { records: [], open: [] }, S.data.staff, { month: S.month, view: S.dstate.view, close: S.dstate.close });
+  };
+
+  /* ---------- Daily Kaam ---------- */
+  V.work = function () { return window.A2ZWork.adminView(S.data, S.month); };
+  function workHost() {
+    var Wk = window.A2ZWork;
+    Wk.host = {
+      admin: true,
+      ctx: function () {
+        var d = S.data, cat = d.catalog || [], sites = [], seen = {}, teams = {};
+        (d.worklogs || []).forEach(function (l) { var k = l.partyId + '|' + l.site; if (!seen[k]) { seen[k] = 1; sites.push({ partyId: l.partyId, site: l.site }); } teams[l.team] = 1; });
+        return { parties: d.parties, works: cat.filter(function (x) { return x.kind === 'work'; }), labour: cat.filter(function (x) { return x.kind === 'labour'; }), sites: sites, teams: Object.keys(teams), today: d.today, catalog: cat, staff: d.staff,
+          rateOf: function (wid, pid) { var p = d.parties.filter(function (x) { return x.id === pid; })[0], o = (p && p.workRates || []).filter(function (r) { return r.workId === wid; })[0], w = cat.filter(function (x) { return x.id === wid; })[0]; return o ? +o.rate || 0 : (w ? +w.rate || 0 : 0); },
+          lrate: function (id) { var w = cat.filter(function (x) { return x.id === id; })[0]; return w ? +w.rate || 0 : 0; } };
+      },
+      logs: function () { return S.data.worklogs || []; },
+      render: function () { render(); },
+      call: function (path, body) { return api('POST', '/api/admin/' + path, body); },
+      save: async function (p) { await api('POST', '/api/admin/work-save', p); await load(); P.toast('\u2713 Save ho gaya'); },
+      del: async function (id) { await api('POST', '/api/admin/work-del', { id: id }); await load(); P.toast('Entry hata di'); },
+      excel: function (logs) { if (!logs.length) { P.toast('Is mahine koi kaam darj nahi'); return; } xbook(window.A2ZWork.sheets(logs, window.A2ZWork.host.ctx()), 'A2Z-daily-kaam'); },
+      catSave: async function (item) { if (!item.id) delete item.id; await api('POST', '/api/admin/save', { col: 'catalog', item: item }); await load(); P.toast('\u2713 List me save ho gaya'); },
+      catDel: async function (id) { await api('POST', '/api/admin/delete', { col: 'catalog', id: id }); await load(); P.toast('List se hata diya'); },
+      seed: async function () { var r = await api('POST', '/api/admin/catalog-seed', {}); await load(); P.toast(r.added + ' naye kaam / labour jude. Ab rate bharein.'); }
+    };
+  }
+  workHost();
+
+  /* party ka commission kise jata hai */
+  function commLine(p) {
+    if (!Array.isArray(p.commTo)) return '<div class="note warn xs">Is party ka commission kise jaye ye tay nahi hai (abhi sabhi staff ko ja raha hai). "Edit / Rate card" me chunein.</div>';
+    var names = p.commTo.map(function (id) { var s = S.data.staff.filter(function (x) { return x.id === id; })[0]; return s ? s.name : ''; }).filter(Boolean);
+    return '<div class="xs">Commission jata hai: ' + (names.length ? '<b>' + esc(names.join(', ')) + '</b>' : '<b>kisi ko nahi</b> (poora hissa company ka)') + '</div>';
+  }
   V.parties = function () {
     var d = S.data, r = d.report, h = '<div class="row between"><h2>Party / Company</h2><div class="row"><button class="btn sec" data-act="xparties">Excel</button><button class="btn" data-act="panel" data-k="party">+ Nayi party</button></div></div>';
     if (!r.byParty.length) h += '<p class="mu">Pehle party jodein aur uska rate card bharein (company kitna deti hai, candidate ko kitna dena hai).</p>';
@@ -145,6 +184,7 @@
         (p.due > 0 ? '<span class="pill ' + (p.overdueDays ? 'red' : 'warn') + '">Baaki ' + inr(p.due) + (p.overdueDays ? ' · ' + p.overdueDays + ' din late' : '') + '</span>' : (p.receivable > 0 ? '<span class="pill good">Poora mila</span>' : '')) + '</div></div>' +
         '<div class="trades">' + P.tradeLine(p.trades) + ' <span class="mu">(kul ' + p.headcount + ')</span></div>' +
         '<div class="cards">' + mini('Company bill', inr(p.bill)) + mini('Company commission', inr(p.bonus)) + mini('Milna chahiye', inr(p.receivable)) + mini('Mil chuka', inr(p.received)) + mini('Baaki', inr(p.due)) + '</div>' +
+        commLine(raw) +
         (rem ? '<div class="xs mu">Aakhri reminder: ' + esc(P.dt(rem.at)) + ' (' + esc(rem.channel) + ')</div>' : '') +
         '<div class="row"><button class="btn sm sec" data-act="open" data-id="' + p.id + '">' + (S.open[p.id] ? 'Candidates chhupayein' : 'Candidates dekhein') + '</button><button class="btn sm sec" data-act="panel" data-k="party" data-id="' + p.id + '">Edit / Rate card</button><button class="btn sm sec" data-act="panel" data-k="receipt" data-id="' + p.id + '">Payment mila</button><button class="btn sm sec" data-act="panel" data-k="remind" data-id="' + p.id + '">Reminder</button><button class="btn sm sec" data-act="xparty" data-id="' + p.id + '">Excel</button></div>';
       if (S.open[p.id]) h += partyTable(p.id);
@@ -531,6 +571,19 @@
     r = r || { trade: '', bill: '', pay: '' };
     return '<tr><td><input class="r-trade" value="' + esc(r.trade) + '" placeholder="Trade (jaise Fitter)" aria-label="Trade"></td><td><input class="r-bill" type="number" min="0" step="any" value="' + esc(r.bill) + '" aria-label="Company deti hai"></td><td><input class="r-pay" type="number" min="0" step="any" value="' + esc(r.pay) + '" aria-label="Candidate ko"></td><td><button type="button" class="link danger" data-act="delrate">Hatayein</button></td></tr>';
   }
+  function partyCommBox(p) {
+    var set = Array.isArray(p.commTo), st = S.data.staff.filter(function (x) { return x.active !== false; });
+    return '<div class="card span-all" id="commToBox"><h4>Is party ka commission kise jaye?</h4><div class="note">Jin staff ko chunenge sirf unhi ko is party ke candidates ka commission jayega. Baaki staff ko is party se commission nahi milega (poora hissa company ka rahega). Ye staff ki apni commission setting ke upar lagta hai.</div>' +
+      '<label>Faisla<select name="ct_set"><option value=""' + (set ? '' : ' selected') + '>Abhi tay nahi (purane tarike se sabko jayega)</option><option value="set"' + (set ? ' selected' : '') + '>Sirf neeche chune hue staff ko (kisi ko na chunein = kisi ko nahi)</option></select></label>' +
+      '<div class="row">' + (st.length ? st.map(function (x) { return '<label class="row"><input type="checkbox" class="ct-box" value="' + esc(x.id) + '"' + (set && p.commTo.indexOf(x.id) >= 0 ? ' checked' : '') + '> ' + esc(x.name) + '</label>'; }).join('') : '<span class="mu">Abhi koi staff nahi.</span>') + '</div></div>';
+  }
+  function partyWorkBox(p) {
+    var works = (S.data.catalog || []).filter(function (x) { return x.kind === 'work' && x.active !== false; });
+    if (!works.length) return '<div class="note span-all">Daily Kaam me is party ke kaam ka alag rate likhna ho to pehle "Daily Kaam" tab me kaam ki list bharein.</div>';
+    var mine = {}; (p.workRates || []).forEach(function (r) { mine[r.workId] = r.rate; });
+    return '<div class="card span-all"><h4>Daily Kaam: is party ke kaam ke rate</h4><div class="note">Khali chhodne par list wala rate lagta hai. Is party ke liye alag rate ho to yahan likhein.</div><div class="scroll"><table><thead><tr><th>Kaam</th><th>List ka rate</th><th>Is party ka rate (₹ per ikai)</th></tr></thead><tbody>' +
+      works.map(function (w) { return '<tr><td>' + esc(w.name) + ' <span class="xs mu">' + esc(w.category === 'civil' ? 'Civil' : 'Mech') + ' · ' + esc(w.unit) + '</span></td><td class="n">' + (w.rate ? inr(w.rate) : 'tay nahi') + '</td><td><input class="wr" data-id="' + esc(w.id) + '" type="number" min="0" step="any" value="' + (mine[w.id] == null ? '' : esc(mine[w.id])) + '"></td></tr>'; }).join('') + '</tbody></table></div></div>';
+  }
   var PANELS = {
     party: function (id) {
       var p = id ? party(id) : { name: '', phone: '', contact: '', address: '', gstin: '', billPct: '', basisDays: '', payDays: '', rates: [], active: true };
@@ -539,6 +592,7 @@
         sel('active', 'Halat', [['true', 'Chalu'], ['false', 'Band']], String(p.active !== false)) +
         '<div class="note">Rate card: har trade ka rate (' + unit() + '). "Company deti hai" = company se kitna milta hai. "Candidate ko" = candidate ko kitna dena hai.</div>' +
         '<div class="scroll"><table><thead><tr><th>Trade</th><th>Company deti hai (' + unit() + ')</th><th>Candidate ko (' + unit() + ')</th><th></th></tr></thead><tbody id="rateRows">' + (p.rates.length ? p.rates : [null]).map(rateRow).join('') + '</tbody></table></div>' +
+        partyCommBox(p) + partyWorkBox(p) +
         '<div class="row"><button type="button" class="btn sm sec" data-act="addrate">+ Trade</button></div><div class="msg" id="msg" role="alert"></div><div class="row"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="closepanel">Band karein</button></div></form>';
     },
     staff: function (id) {
@@ -605,6 +659,8 @@
     party: async function (f) {
       var o = collect(f), rates = $$('#rateRows tr', f).map(function (tr) { return { trade: $('.r-trade', tr).value, bill: $('.r-bill', tr).value, pay: $('.r-pay', tr).value }; }).filter(function (r) { return r.trade.trim(); });
       var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates };
+      item.commTo = o.ct_set === 'set' ? $$('.ct-box', f).filter(function (x) { return x.checked; }).map(function (x) { return x.value; }) : null;
+      item.workRates = $$('.wr', f).filter(function (x) { return x.value !== ''; }).map(function (x) { return { workId: x.dataset.id, rate: x.value }; });
       if (o.id) item.id = o.id; await save('parties', item);
     },
     staff: async function (f) {
@@ -736,22 +792,35 @@
   var XT = { 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
     'Company-wise': 'Party-wise Billing Summary', 'Payment kram': 'Payment Sequence Statement', 'Owners ka hissa': 'Owners Profit Share Statement', 'Party-wise hisaab': 'Party-wise Account Statement', 'Staff-wise hisaab': 'Staff-wise Account Statement',
     'Aaya-gaya': 'Cash Inflow & Outflow Statement', 'Chukaya (paid)': 'Payments Made Statement', 'Payment record': 'Payment Register', 'Advance': 'Advance Register', 'Kharch': 'Expense Register', 'Supplier': 'Manpower Supplier Statement',
-    'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Din-wise ginti': 'Day-wise Man-days Summary' };
+    'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Daily Kaam': 'Daily Work & Labour Cost Statement', 'Duty': 'Staff Duty (IN / OUT) Register', 'Staff-wise': 'Staff-wise Attendance (Duty)', 'Party-wise': 'Party-wise Work & Labour Summary', 'Jagah-wise': 'Site-wise Work & Labour Summary', 'Team-wise': 'Team-wise Work & Labour Summary', 'Din-wise': 'Day-wise Work & Labour Summary', 'Din-wise ginti': 'Day-wise Man-days Summary' };
   var XNT = { 'Payment kram': 1, 'Staff-wise hisaab': 1, 'Owners ka hissa': 1, 'Aaya-gaya': 1, 'Suraksha alerts': 1, 'Party': 1, 'Candidates': 1, 'Staff': 1, 'Supplier': 1 };
   function xbook(sheets, name) {
     var meta = { period: P.monthName(S.month) };
-    sheets = sheets.map(function (sh) { return { name: sh.name, rows: sh.rows, widths: sh.widths, title: sh.title || XT[sh.name] || sh.name, total: XNT[sh.name] ? false : sh.total }; });
+    sheets = sheets.map(function (sh) { return { name: sh.name, rows: sh.rows, widths: sh.widths, title: sh.title || XT[sh.name] || sh.name, total: XNT[sh.name] ? false : sh.total, totalHeaders: sh.totalHeaders }; });
     P.download(A2ZXlsx.writeBook(sheets, meta), name + '-' + S.month + '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
 
   /* ---------- events ---------- */
   function docRefresh() { var el = document.querySelector('.docslots'); if (el && S.panel) { var rec = S.panel.k === 'staff' ? staff(S.panel.id) : cand(S.panel.id); el.outerHTML = P.docSlots(S.panel.id && rec ? rec.docKeys : [], S.pdocs, !!S.panel.id); } }
   var A = {
+    dduty: async function () { await load(); P.toast('Sthiti taza ho gayi'); },
+    dphoto: async function (b) {
+      var d = (S.data.duty.records.concat(S.data.duty.open)).filter(function (x) { return x.id === b.dataset.id; })[0], who = d ? staff(d.staffId) : null;
+      S.dstate.view = { title: (who ? who.name : '') + ' - ' + (b.dataset.w === 'out' ? 'OUT' : 'IN') + ' selfie', loading: true, photo: '' }; render(); window.scrollTo(0, 0);
+      try { var r = await api('POST', '/api/admin/duty-photo', { id: b.dataset.id, which: b.dataset.w }); S.dstate.view.photo = r.photo || ''; } catch (e) { P.toast(e.message); }
+      S.dstate.view.loading = false; render();
+    },
+    dviewx: function () { S.dstate.view = null; render(); },
+    dclose: function (b) { S.dstate.close = b.dataset.id; render(); var e = document.getElementById('dclosebox'); if (e) e.scrollIntoView({ block: 'center' }); },
+    dclosex: function () { S.dstate.close = null; render(); },
+    dclosego: async function (b) { var id = S.dstate.close; S.dstate.close = null; await api('POST', '/api/admin/duty-close', { id: id, count: b.dataset.c === '1', month: S.month }); await load(); P.toast('Duty band ho gayi'); },
+    ddel: async function (b) { if (!window.confirm('Ye duty entry (selfie ke saath) hamesha ke liye hata dein?')) return; await api('POST', '/api/admin/duty-del', { id: b.dataset.id, month: S.month }); await load(); P.toast('Entry hata di'); },
+    xduty: function () { var d = S.data.duty || { records: [] }; if (!d.records.length) { P.toast('Is mahine koi duty nahi'); return; } xbook(window.A2ZDuty.sheets(d, S.data.staff, S.month), 'A2Z-duty'); },
     xsup: function () { var L = supData(); if (!L.length) { P.toast('Koi manpower supplier nahi hai'); return; } xbook(supSheets(L), 'A2Z-supplier-hisaab'); },
     xsup1: function (b) { var L = supData().filter(function (x) { return x.s.id === b.dataset.id; }); if (L.length) xbook(supSheets(L), 'A2Z-supplier-' + (L[0].s.serial || 'x')); },
     docpend: function (b) { P.viewImage(S.pdocs[b.dataset.doc], 'Document'); },
     docdrop: function (b) { delete S.pdocs[b.dataset.doc]; docRefresh(); },
     docview: async function (b) { var r = await api('POST', '/api/admin/photo', { kind: S.panel.k === 'staff' ? 'staff' : 'cand', id: S.panel.id, doc: b.dataset.doc }); if (r.photo) P.viewImage(r.photo, 'Document'); else P.toast('Document nahi mila'); },
-    tab: async function (b) { S.tab = b.dataset.id; S.panel = null; render(); if (S.tab === 'sec') await secLoad(); },
+    tab: async function (b) { S.tab = b.dataset.id; S.panel = null; render(); if (S.tab === 'sec') await secLoad(); if (S.tab === 'work' || S.tab === 'duty') await load(); },
     secgo: function (b) { S.tab = b.dataset.id; S.panel = null; render(); },
     secack: async function (b) { await api('POST', '/api/admin/sec-ack', { id: b.dataset.id }); await secLoad(); },
     secackall: async function () { await api('POST', '/api/admin/sec-ack', { all: true }); await secLoad(); },

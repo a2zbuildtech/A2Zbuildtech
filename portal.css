@@ -162,3 +162,7 @@ body.busy{cursor:progress}
 .donetbl{width:100%;text-align:left;border-collapse:collapse;font-size:14px}.donetbl th{border-bottom:0;white-space:normal;width:42%;font-weight:600;opacity:.75;padding:4px 6px;vertical-align:top}.donetbl td{padding:4px 6px;word-break:break-word}.donetbl tr{border-bottom:1px solid #8883}
 #candRes{min-width:0;max-width:100%;overflow-x:auto}
 .donebox h3{color:var(--fg,inherit)}.donetbl td{color:var(--fg,inherit)}
+.good{color:var(--ok)}
+fieldset.card{margin:0;min-width:0}
+fieldset.card legend{padding:0 6px;font-weight:700;font-size:13px}
+img.selfie{max-width:min(100%,320px);border-radius:8px;display:block;margin-top:8px}

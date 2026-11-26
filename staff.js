@@ -9,9 +9,9 @@
   function tset(v) { try { if (v) { localStorage.setItem(SKEY, v); } else { localStorage.removeItem(SKEY); sessionStorage.removeItem(SKEY); } } catch (e) { try { if (v) sessionStorage.setItem(SKEY, v); else sessionStorage.removeItem(SKEY); } catch (x) { /* ignore */ } } }
   var LINK = /^[0-9a-f]{32}$/.test(HASH);                 // purana seedha link bhi chalta hai
   var TOKEN = LINK ? HASH : tget();
-  var S = { month: P.thisMonth(), tab: 'home', view: null, screen: '', f: {}, form: null, hz: null, hzParty: '', q: '', photos: {}, rq: null, pw: false, msg: '' };
+  var S = { month: P.thisMonth(), tab: 'home', view: null, screen: '', f: {}, form: null, hz: null, duty: {}, adv: null, af: {}, hzParty: '', q: '', photos: {}, rq: null, pw: false, msg: '' };
   var TYPE = { agent: 'Staff', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
-  var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['hisaab', 'Mera hisaab'], ['ids', 'ID dekhein'], ['help', 'Madad (Help)']];
+  var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['duty', 'Duty (IN / OUT)'], ['hazri', 'Hazri (Daily)'], ['work', 'Daily Kaam'], ['hisaab', 'Mera hisaab'], ['ids', 'ID dekhein'], ['help', 'Madad (Help)']];
 
   function api(method, url, body) { return P.api(method, url, body, { 'x-staff-token': TOKEN }); }
   function unit() { return S.view && S.view.perDay ? '/din' : '/mahina'; }
@@ -58,15 +58,52 @@
       setTopbar(false); showPage('<div class="note warn"><b>Ye kaam nahi kar raha.</b><br>' + esc(e.message) + '</div>' + (LINK ? '' : '<button class="btn" data-act="backlogin">Login par jayein</button>')); return;
     }
     S.screen = 'app'; $('#who').textContent = S.view.staff.name; $('#whoSub').textContent = (TYPE[S.view.staff.type] || 'Staff') + (S.view.staff.serial ? ' · ' + S.view.staff.serial : '');
-    setTopbar(true); $('#month').value = S.month; S.hz = null; render();
+    setTopbar(true); $('#month').value = S.month; S.hz = null; render(); pingSync();
   }
   function render() {
     if (S.screen !== 'app') return;
     var sx = ($('#hzs') || {}).scrollLeft;
     $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'cands' && pendingCands() ? ' (' + pendingCands() + ')' : '') + '</button>'; }).join('');
-    showPage(({ home: homeView, cands: candsView, hazri: hazriView, hisaab: hisaabView, ids: idsView, help: helpView })[S.tab]());
+    showPage(({ home: homeView, cands: candsView, hazri: hazriView, work: workView, duty: dutyView, hisaab: hisaabView, ids: idsView, help: helpView })[S.tab]());
     if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'staff', { quick: ['s-register', 's-cand-add', 's-hazri', 's-hisaab', 's-profile', 's-search', 's-rate'], hello: 'Staff panel ke saare kaam: login, registration, ID card, candidate admission form, hazri, hisaab. Apna sawal likhein, jaise "admission form kahan se milega?"' });
     if (sx && $('#hzs')) $('#hzs').scrollLeft = sx;
+  }
+  /* ---------- Daily Kaam (staff sirf entry karta hai; rate / keemat / munafa ise dikhte hi nahi) ---------- */
+  function workView() {
+    var Wk = window.A2ZWork, w = S.view.work || { works: [], labour: [], sites: [], logs: [] };
+    return '<div class="row between"><h2>Daily Kaam</h2><button class="btn" data-wact="wnew">+ Aaj ka kaam likhein</button></div><div class="note">Yahan roz ka kaam aur kitne labour lage wo likhein. Kaam ka rate aur hisaab sirf admin dekhta hai. Admin ka jawab (theek hai / sudhar karein) neeche dikhega.</div>' +
+      (Wk.st.open ? Wk.form('Naya kaam / badlav') : '') + Wk.staffList(w.logs);
+  }
+  (function () {
+    var Wk = window.A2ZWork; if (!Wk) return;
+    Wk.host = {
+      admin: false,
+      ctx: function () {
+        var w = S.view.work || { works: [], labour: [], sites: [] };
+        return { parties: S.view.parties, works: w.works, labour: w.labour, sites: w.sites, teams: [], today: new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10), catalog: [], staff: [] };
+      },
+      logs: function () { return (S.view.work && S.view.work.logs) || []; },
+      render: function () { render(); },
+      call: function (path, body) { return api('POST', '/api/staff/' + path, body); },
+      save: async function (p) { await api('POST', '/api/staff/work-save', p); await load(); P.toast('\u2713 Kaam save ho gaya'); },
+      del: async function (id) { await api('POST', '/api/staff/work-del', { id: id }); await load(); P.toast('Entry hata di'); },
+      excel: function () {}
+    };
+  })();
+  /* ---------- Duty IN / OUT ---------- */
+  function dutyView() { return window.A2ZDuty.staffHtml(S.view.duty, S.duty); }
+  var pingT = null;
+  function pingSync() {
+    var on = S.view && S.view.duty && S.view.duty.open;
+    if (!on) { if (pingT) { clearInterval(pingT); pingT = null; } return; }
+    if (pingT) return;
+    var send = function () { if (document.hidden) return; window.A2ZDuty.pos(true).then(function (p) { return api('POST', '/api/staff/duty-ping', p); }).then(function (r) { if (r && r.on === false) { load(); } }).catch(function () {}); };
+    send(); pingT = setInterval(send, 5 * 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && pingT) send(); });
+  }
+  function getGps() {
+    S.duty.gps = true; S.duty.err = ''; if (S.tab === 'duty') render();
+    return window.A2ZDuty.pos(false).then(function (p) { S.duty.pos = p; S.duty.gps = false; S.duty.err = ''; }).catch(function (e) { S.duty.pos = null; S.duty.gps = false; S.duty.err = e.message; }).then(function () { if (S.tab === 'duty') render(); });
   }
   function helpView() { return '<h2>Madad (Help) - A2Z Sahayak</h2><div class="note">Koi bhi kaam samajh na aaye to yahan poochhein; step-by-step bataya jayega.</div><div id="helpBox"></div>'; }
   function pendingCands() { return S.view.candidates.filter(function (c) { return c.approval === 'pending'; }).length; }
@@ -198,6 +235,18 @@
     if (st.commMode === 'none') return 'Aapke liye koi commission tay nahi hai (admin hi tay karta hai).';
     return 'Aapka commission ka tareeka admin ne abhi tay nahi kiya, isliye abhi commission \u20b90 dikh raha hai.';
   }
+  /* ---------- labour ko advance (staff deta hai, mahine ke ant ki payment se kat jata hai) ---------- */
+  function advBox(v) {
+    var cs = v.candidates.filter(function (c) { return c.approval === 'approved' && c.status !== 'left'; });
+    if (!S.adv) return '<div class="row noprint"><button class="btn" data-act="advnew">+ Labour / candidate ko advance dein</button></div>';
+    var f = S.af;
+    return '<div class="card" id="advform"><h3>Advance dein</h3><div class="note">Jo advance aap apne candidate (mistri / labour) ko dete hain wo yahan likhein. Ye us mahine ke "Dena baaki" me se kat jayega, isliye mahine ke ant ki payment utni kam banegi.</div><div class="grid">' +
+      '<label>Candidate *<select data-af="candId"><option value="">— chuniye —</option>' + cs.map(function (c) { return '<option value="' + esc(c.id) + '"' + (c.id === f.candId ? ' selected' : '') + '>' + esc(c.name) + ' (' + esc(c.trade) + ' · ' + esc(c.partyName) + ')</option>'; }).join('') + '</select></label>' +
+      '<label>Rakam (Rs) *<input data-af="amount" type="number" min="1" step="any" inputmode="decimal" value="' + esc(f.amount || '') + '"></label>' +
+      '<label>Tarikh<input data-af="date" type="date" value="' + esc(f.date || '') + '"></label>' +
+      '<label>Note (zaruri nahi)<input data-af="note" maxlength="100" value="' + esc(f.note || '') + '"></label></div><div class="msg" id="advmsg" role="alert"></div>' +
+      '<div class="row"><button class="btn" data-act="advsave">Advance save karein</button><button class="btn sec" data-act="advcancel">Band karein</button></div></div>';
+  }
   function hisaabView() {
     var v = S.view, t = v.totals;
     return '<div class="row between noprint"><h2>Mera hisaab (' + P.monthName(S.month) + ')</h2><button class="btn sec" data-act="print">Print</button></div>' + summary() +
@@ -206,7 +255,8 @@
       '<tr class="tot"><td>Kul</td><td class="n">' + t.candidates + '</td><td class="n">' + nf(t.days) + '</td><td class="n">' + inr(t.pay) + '</td><td class="n">' + inr(t.commission) + '</td><td class="n">' + inr(t.gst) + '</td><td class="n">' + inr(t.net) + '</td></tr></tbody></table></div>' +
       '<h3>Candidate-wise</h3><div class="card scroll"><table><thead><tr><th>Serial</th><th>Naam</th><th>Party</th><th>Trade</th><th class="n">Din</th><th class="n">Rate' + unit() + '</th><th class="n">Wage</th><th class="n">Advance</th><th class="n">Chukaya</th><th class="n">Dena baaki</th></tr></thead><tbody>' +
       (v.candidates.filter(function (c) { return c.approval === 'approved'; }).map(function (c) { return '<tr><td class="xs">' + esc(c.serial) + '</td><td>' + esc(c.name) + '</td><td>' + esc(c.partyName) + '</td><td>' + esc(c.trade) + '</td><td class="n">' + nf(c.days) + '</td><td class="n">' + inr(c.payRate) + '</td><td class="n">' + inr(c.pay) + '</td><td class="n">' + inr(c.advance) + '</td><td class="n">' + inr(c.paid) + '</td><td class="n">' + inr(r2(c.pay - c.advance - c.paid)) + '</td></tr>'; }).join('') || '<tr><td colspan="9" class="mu">Koi nahi</td></tr>') + '</tbody></table></div>' +
-      (v.advances.length ? '<h3>Advance</h3><div class="card scroll"><table><thead><tr><th>Tarikh</th><th>Kiska</th><th>Note</th><th class="n">Rakam</th></tr></thead><tbody>' + v.advances.map(function (a) { var c = v.candidates.filter(function (x) { return x.id === a.refId; })[0]; return '<tr><td>' + P.dd(a.date) + '</td><td>' + (a.kind === 'staff' ? 'Aapka' : esc(c ? c.name : '')) + '</td><td>' + esc(a.note) + '</td><td class="n">' + inr(a.amount) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '') +
+      advBox(v) +
+      '<h3>Advance (aapne / admin ne diya)</h3><div class="card scroll"><table><thead><tr><th>Tarikh</th><th>Kiska</th><th>Kisne</th><th>Note</th><th class="n">Rakam</th><th></th></tr></thead><tbody>' + (v.advances.length ? v.advances.map(function (a) { var c = v.candidates.filter(function (x) { return x.id === a.refId; })[0]; var mine = a.by === 'staff:' + v.staff.id; return '<tr><td>' + P.dd(a.date) + '</td><td>' + (a.kind === 'staff' ? 'Aapka' : esc(c ? c.name : '')) + '</td><td>' + (mine ? 'Aapne' : 'Admin ne') + '</td><td>' + esc(a.note) + '</td><td class="n">' + inr(a.amount) + '</td><td>' + (mine ? '<button class="link danger" data-act="deladv" data-id="' + a.id + '">Hatayein (aaj ki)</button>' : '') + '</td></tr>'; }).join('') : '<tr><td colspan="6" class="mu">Is mahine koi advance nahi.</td></tr>') + '</tbody></table></div>' +
       (v.payments.length ? '<h3>Payments (jo chukaye gaye)</h3><div class="card scroll"><table><thead><tr><th>Tarikh</th><th>Kisko</th><th>Tareeka</th><th>Note</th><th class="n">Rakam</th></tr></thead><tbody>' + v.payments.map(function (p) { var c = v.candidates.filter(function (x) { return x.id === p.refId; })[0]; return '<tr><td>' + P.dd(p.date) + '</td><td>' + (p.kind === 'staff' ? 'Aapko' : esc(c ? c.name : '')) + '</td><td>' + esc(({ cash: 'Cash', upi: 'UPI', bank: 'Bank', other: 'Anya' })[p.mode] || p.mode) + '</td><td>' + esc(p.note) + '</td><td class="n">' + inr(p.amount) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '') +
       '<div class="note">' + commNote(v.staff) + ' Isme se GST ' + v.gstPct + '% kat kar "Net" milta hai. Jo hazri admin ne approve nahi ki wo yahan andaze me judti hai, admin ke final hisaab me approve hone par judti hai.</div>';
   }
@@ -221,6 +271,23 @@
   /* ---------- actions ---------- */
   function refreshDocs() { var el = document.querySelector('.docslots'); if (el) el.outerHTML = P.docSlots(S.f.docKeys, S.f.docs, !!S.f.id); }
   var A = {
+    advnew: function () { S.adv = true; S.af = { date: new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10) }; render(); var e = $('#advform'); if (e) e.scrollIntoView({ block: 'center' }); },
+    advcancel: function () { S.adv = false; render(); },
+    advsave: async function (b) {
+      var f = S.af, m = $('#advmsg'); if (!f.candId) { m.textContent = 'Candidate chuniye'; return; } if (!(Number(f.amount) > 0)) { m.textContent = 'Rakam likhein'; return; }
+      b.disabled = true;
+      try { var r = await api('POST', '/api/staff/advance-save', { candId: f.candId, amount: f.amount, date: f.date, note: f.note || '', month: S.month }); S.view = r.view; S.adv = false; render(); P.toast(r.warn ? r.warn : '\u2713 Advance darj ho gaya'); }
+      catch (x) { b.disabled = false; m.textContent = x.message; }
+    },
+    deladv: async function (b) { if (!window.confirm('Ye advance hata dein?')) return; var r = await api('POST', '/api/staff/advance-del', { id: b.dataset.id, month: S.month }); S.view = r.view; render(); P.toast('Advance hata diya'); },
+    dstart: function (b) { S.duty = { mode: b.dataset.mode, photo: '', pos: null, err: '', gps: true, busy: false }; render(); getGps(); },
+    dgps: function () { return getGps(); },
+    dcancel: function () { S.duty = {}; render(); },
+    dconfirm: async function (b) {
+      var d = S.duty; if (!d.photo || !d.pos) return; d.busy = true; render();
+      try { var r = await api('POST', '/api/staff/duty-' + d.mode, { photo: d.photo, lat: d.pos.lat, lng: d.pos.lng, acc: d.pos.acc, month: S.month }); S.view = r.view; var was = d.mode; S.duty = {}; render(); pingSync(); P.toast(was === 'in' ? '\u2713 IN ho gaya. Duty shuru.' : '\u2713 OUT ho gaya. Aaj ki attendance lag gayi.'); }
+      catch (x) { d.busy = false; render(); var m = $('#dmsg'); if (m) m.textContent = x.message; }
+    },
     docpend: function (b) { P.viewImage(S.f.docs[b.dataset.doc], 'Document'); },
     docdrop: function (b) { delete S.f.docs[b.dataset.doc]; refreshDocs(); },
     docview: async function (b) { var r = await api('POST', '/api/staff/photo', { kind: 'cand', id: S.f.id, doc: b.dataset.doc }); if (r.photo) P.viewImage(r.photo, 'Document'); else P.toast('Document nahi mila'); },
@@ -307,11 +374,14 @@
   document.addEventListener('input', function (e) {
     var t = e.target;
     if (t.id === 'idq') { S.idq = t.value; clearTimeout(S.idT); S.idT = setTimeout(function () { var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); }, 100); return; }
+    if (t.dataset && t.dataset.af) { S.af[t.dataset.af] = t.value; return; }
     if (t.dataset && t.dataset.f) S.f[t.dataset.f] = t.value;
     else if (t.id === 'q') { S.q = t.value; clearTimeout(S.qT); S.qT = setTimeout(function () { var rs = $('#candRes'); if (rs) rs.innerHTML = candTable(S.q); }, 120); }
   });
   document.addEventListener('change', async function (e) {
     var t = e.target;
+    if (t.dataset && t.dataset.af) { S.af[t.dataset.af] = t.value; return; }
+    if (t.id === 'dutyFile' && t.files && t.files[0]) { var df0 = t.files[0]; t.value = ''; try { S.duty.photo = await window.A2ZDuty.selfie(df0); render(); } catch (x) { P.toast(x.message); } return; }
     if (t.dataset && t.dataset.f === 'hzp') { S.hzParty = t.value; S.hz = null; render(); }
     else if (t.dataset && t.dataset.f) S.f[t.dataset.f] = t.value;
     else if (t.classList.contains('doc-file') && t.files && t.files[0]) {

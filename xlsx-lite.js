@@ -91,7 +91,8 @@
     'Kram': 'Sr. No.', 'Baaki': 'Balance (Rs.)', 'Baaki dena': 'Balance Due (Rs.)', 'Mil chuka': 'Received (Rs.)', 'Milna chahiye': 'Receivable (Rs.)', 'Chukaya': 'Paid (Rs.)', 'Dena tha': 'Payable (Rs.)',
     'Halat': 'Status', 'Candidates': 'Candidates', 'Candidates ka wage': 'Candidates Wage (Rs.)', 'Company commission': 'Company Commission (Rs.)', 'Company %': 'Company Commission (Rs.)', 'Firm ka hissa': 'Firm Share (Rs.)',
     'Staff commission': 'Staff Commission (Rs.)', 'Net milega': 'Net Payable (Rs.)', 'Fixed payment': 'Fixed Payment (Rs.)', 'Commission ka tareeka': 'Commission Method', 'Candidates ka wage ': 'Candidates Wage (Rs.)',
-    'Advance': 'Advance (Rs.)', 'GST kata': 'GST Deducted (Rs.)', 'Aana': 'Receivable (Rs.)', 'Aaya': 'Received (Rs.)', 'Net (fixed sahit)': 'Net incl. Fixed (Rs.)', 'Kul din (man-days)': 'Total Man-days' };
+    'Advance': 'Advance (Rs.)', 'GST kata': 'GST Deducted (Rs.)', 'Aana': 'Receivable (Rs.)', 'Aaya': 'Received (Rs.)', 'Net (fixed sahit)': 'Net incl. Fixed (Rs.)', 'Kul din (man-days)': 'Total Man-days',
+    'Jagah': 'Site', 'Team': 'Team', 'Kaam': 'Work', 'Ikai': 'Unit', 'Aaj tak ka kul': 'Cumulative Qty', 'Aaj ka kaam': 'Today Qty', 'Labour': 'Labour (Nos)', 'Labour ka vivaran': 'Labour Details', 'Kaam ki keemat': 'Work Value (Rs.)', 'Labour kharch': 'Labour Cost (Rs.)', 'Munafa': 'Profit (Rs.)', 'Admin ka jawab': 'Admin Remark', 'Entry': 'Entries', 'Labour (din)': 'Labour (Man-days)', 'Party / Jagah': 'Party / Site', 'Party / Jagah / Team': 'Party / Site / Team', 'Staff': 'Staff', 'IN': 'IN Time', 'OUT': 'OUT Time', 'Ghante': 'Hours', 'Halat': 'Status', 'IN location': 'IN Location', 'OUT location': 'OUT Location', 'Attendance (din)': 'Attendance (Days)', 'Duty ke ghante': 'Duty Hours' };
   function fmtNow() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return z(d.getDate()) + '-' + z(d.getMonth() + 1) + '-' + d.getFullYear() + ' ' + z(d.getHours()) + ':' + z(d.getMinutes()); }
   function q1(n) { return "'" + String(n).replace(/'/g, "''") + "'"; }
   function r2(n) { return Math.round(n * 100) / 100; }
@@ -122,7 +123,7 @@
       var hv = String(head[c] || ''), nums = 0, other = 0;
       body.forEach(function (r) { var v = r[c]; if (v === '' || v === null || v === undefined) return; if (typeof v === 'number' && isFinite(v)) nums++; else other++; });
       plain[c] = PLAIN.test(hv);
-      totalable[c] = c > 0 && nums > 0 && other === 0 && !NOTOT.test(hv);
+      totalable[c] = c > 0 && nums > 0 && other === 0 && !NOTOT.test(hv) && (!sh.totalHeaders || sh.totalHeaders.indexOf(String((rows[0] || [])[c])) >= 0);
     }
     var wantTotal = sh.total === true || (sh.total !== false && nc > 2 && body.length > 1);
     var first = hr + 1;
