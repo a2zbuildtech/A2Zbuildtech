@@ -3,8 +3,8 @@
 (function () {
   'use strict';
   var $ = P.$, $$ = P.$$, esc = P.esc, inr = P.inr, nf = P.nf, api = P.api;
-  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {} };
-  var TABS = [['dash', 'Overview'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
+  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {}, master: { d: null, st: {} } };
+  var TABS = [['dash', 'Overview'], ['master', 'Poora Dashboard'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
   var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
   var CMODE = { percent: 'Percent (%)', fixed: 'Fixed rate (trade-wise)', none: 'Koi hissa nahi (admin tay karega)' };
   function cmLabel(x) {
@@ -135,6 +135,14 @@
     return h;
   };
   function kpi(l, v) { return '<div class="card"><span class="lbl">' + esc(l) + '</span><span class="kpi">' + v + '</span></div>'; }
+
+  /* ---------- Poora Dashboard (shuru se aaj tak) ---------- */
+  V.master = function () {
+    var m = S.master; if (!m.d) return '<h2>Poora Dashboard</h2><div class="note">' + (m.err ? esc(m.err) : 'Shuru se aaj tak ka hisaab la raha hoon...') + '</div>';
+    return window.A2ZMaster.html(m.d, m.st);
+  };
+  async function masterLoad() { S.master.err = ''; try { S.master.d = await api('POST', '/api/admin/master', {}); } catch (e) { S.master.d = null; S.master.err = e.message; } render(); }
+  function masterRes() { var r = $('#mres'); if (r && S.master.d) r.innerHTML = window.A2ZMaster.results(S.master.d, S.master.st); }
 
   /* ---------- Duty / Location ---------- */
   var dutyT = null;
@@ -814,7 +822,7 @@
   var XT = { 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
     'Company-wise': 'Party-wise Billing Summary', 'Payment kram': 'Payment Sequence Statement', 'Owners ka hissa': 'Owners Profit Share Statement', 'Party-wise hisaab': 'Party-wise Account Statement', 'Staff-wise hisaab': 'Staff-wise Account Statement',
     'Aaya-gaya': 'Cash Inflow & Outflow Statement', 'Chukaya (paid)': 'Payments Made Statement', 'Payment record': 'Payment Register', 'Advance': 'Advance Register', 'Kharch': 'Expense Register', 'Supplier': 'Manpower Supplier Statement',
-    'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Daily Kaam': 'Daily Work & Labour Cost Statement', 'Duty': 'Staff Duty (IN / OUT) Register', 'Staff-wise': 'Staff-wise Attendance (Duty)', 'Party-wise': 'Party-wise Work & Labour Summary', 'Jagah-wise': 'Site-wise Work & Labour Summary', 'Team-wise': 'Team-wise Work & Labour Summary', 'Din-wise': 'Day-wise Work & Labour Summary', 'Din-wise ginti': 'Day-wise Man-days Summary' };
+    'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Daily Kaam': 'Daily Work & Labour Cost Statement', 'Duty': 'Staff Duty (IN / OUT) Register', 'Kul jod': 'Overall Business Summary (Since Start)', 'Mahine-wise': 'Month-wise Business Summary', 'Sab entries': 'All Entries Register (Since Start)', 'Staff-wise': 'Staff-wise Attendance (Duty)', 'Party-wise': 'Party-wise Work & Labour Summary', 'Jagah-wise': 'Site-wise Work & Labour Summary', 'Team-wise': 'Team-wise Work & Labour Summary', 'Din-wise': 'Day-wise Work & Labour Summary', 'Din-wise ginti': 'Day-wise Man-days Summary' };
   var XNT = { 'Payment kram': 1, 'Staff-wise hisaab': 1, 'Owners ka hissa': 1, 'Aaya-gaya': 1, 'Suraksha alerts': 1, 'Party': 1, 'Candidates': 1, 'Staff': 1, 'Supplier': 1 };
   function xbook(sheets, name) {
     var meta = { period: P.monthName(S.month) };
@@ -824,6 +832,10 @@
   /* ---------- events ---------- */
   function docRefresh() { var el = document.querySelector('.docslots'); if (el && S.panel) { var rec = S.panel.k === 'staff' ? staff(S.panel.id) : cand(S.panel.id); el.outerHTML = P.docSlots(S.panel.id && rec ? rec.docKeys : [], S.pdocs, !!S.panel.id); } }
   var A = {
+    mrefresh: async function () { await masterLoad(); P.toast('Taza ho gaya'); },
+    mtype: function (b) { S.master.st.type = b.dataset.id; S.master.st.page = 0; render(); },
+    mpage: function (b) { S.master.st.page = Number(b.dataset.n) || 0; masterRes(); var r = $('#mres'); if (r) r.scrollIntoView({ block: 'start' }); },
+    xmaster: function () { if (!S.master.d) { P.toast('Pehle dashboard khulne dein'); return; } xbook(window.A2ZMaster.sheets(S.master.d, S.master.st), 'A2Z-poora-dashboard'); },
     dduty: async function () { await load(); P.toast('Sthiti taza ho gayi'); },
     dphoto: async function (b) {
       var d = (S.data.duty.records.concat(S.data.duty.open)).filter(function (x) { return x.id === b.dataset.id; })[0], who = d ? staff(d.staffId) : null;
@@ -842,7 +854,7 @@
     docpend: function (b) { P.viewImage(S.pdocs[b.dataset.doc], 'Document'); },
     docdrop: function (b) { delete S.pdocs[b.dataset.doc]; docRefresh(); },
     docview: async function (b) { var r = await api('POST', '/api/admin/photo', { kind: S.panel.k === 'staff' ? 'staff' : 'cand', id: S.panel.id, doc: b.dataset.doc }); if (r.photo) P.viewImage(r.photo, 'Document'); else P.toast('Document nahi mila'); },
-    tab: async function (b) { S.tab = b.dataset.id; S.panel = null; render(); if (S.tab === 'sec') await secLoad(); if (S.tab === 'work' || S.tab === 'duty') await load(); },
+    tab: async function (b) { S.tab = b.dataset.id; S.panel = null; render(); if (S.tab === 'sec') await secLoad(); if (S.tab === 'work' || S.tab === 'duty') await load(); if (S.tab === 'master' && !S.master.d) await masterLoad(); },
     secgo: function (b) { S.tab = b.dataset.id; S.panel = null; render(); },
     secack: async function (b) { await api('POST', '/api/admin/sec-ack', { id: b.dataset.id }); await secLoad(); },
     secackall: async function () { await api('POST', '/api/admin/sec-ack', { all: true }); await secLoad(); },
@@ -968,6 +980,7 @@
     var t = e.target;
     if (t.classList.contains('doc-file') && t.files && t.files[0]) { var dk = t.dataset.doc, df = t.files[0]; t.value = ''; P.photoFromFile(df, { kind: 'doc' }).then(function (u) { S.pdocs[dk] = u; docRefresh(); }, function (x) { if (x.message !== 'cancel') P.toast(x.message); }); return; }
     if (t.id === 'pfile' && t.files && t.files[0]) { P.photoFromFile(t.files[0], { kind: 'photo' }).then(function (u) { S.pph = u; var pb = $('#pbox'); if (pb) pb.innerHTML = '<img alt="photo" src="' + esc(u) + '">'; }, function (x) { P.toast(x.message); }); t.value = ''; return; }
+    if (t.dataset && t.dataset.m) { S.master.st[t.dataset.m] = t.value; S.master.st.page = 0; masterRes(); return; }
     if (t.classList.contains('cm-sel')) { commShow(t.closest('.commbox')); return; }
     if (t.name === 'model' || t.name === 'commKind') { var fm = t.form; if (fm) { if (t.name === 'model') fm.dataset.model = t.value; rcAuto(fm); } return; }
     if (t.classList.contains('js-days')) {
@@ -976,6 +989,7 @@
   });
   document.addEventListener('input', function (e) {
     if (e.target && (e.target.classList.contains('r-pay') || e.target.classList.contains('r-comm'))) { rcAuto(e.target.form); return; }
+    if (e.target && e.target.id === 'mq') { S.master.st.q = e.target.value; S.master.st.page = 0; clearTimeout(S.mT); S.mT = setTimeout(masterRes, 150); return; }
     if (e.target && e.target.id === 'idq') { S.idq = e.target.value; clearTimeout(S.idT); S.idT = setTimeout(function () { var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); }, 100); return; }
     var t = e.target;
     if (t.id === 'fq') {
