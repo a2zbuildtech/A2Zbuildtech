@@ -166,3 +166,6 @@ body.busy{cursor:progress}
 fieldset.card{margin:0;min-width:0}
 fieldset.card legend{padding:0 6px;font-weight:700;font-size:13px}
 img.selfie{max-width:min(100%,320px);border-radius:8px;display:block;margin-top:8px}
+form[data-model="labour"] .m-none,form[data-model="labour"] .m-measure,form[data-model="measure"] .m-none,form[data-model="measure"] .m-labour,form[data-model=""] .m-labour,form[data-model=""] .m-measure{display:none}
+form[data-model="measure"] .c-bill,form[data-model=""] .c-comm,form[data-model="measure"] .c-comm{display:none}
+form[data-model="labour"] .m-work{display:none}

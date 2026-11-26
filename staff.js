@@ -80,7 +80,7 @@
       admin: false,
       ctx: function () {
         var w = S.view.work || { works: [], labour: [], sites: [] };
-        return { parties: S.view.parties, works: w.works, labour: w.labour, sites: w.sites, teams: [], today: new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10), catalog: [], staff: [] };
+        return { parties: S.view.parties.filter(function (p) { return p.model !== 'labour'; }), works: w.works, labour: w.labour, sites: w.sites, teams: [], today: new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10), catalog: [], staff: [] };
       },
       logs: function () { return (S.view.work && S.view.work.logs) || []; },
       render: function () { render(); },
@@ -140,7 +140,18 @@
       (S.pw ? '<div class="panel"><h3>Password badlein</h3><div class="form-grid">' + fld('Purana password', 'old', { type: 'password' }) + fld('Naya password (10+, akshar + ank)', 'npw', { type: 'password' }) + '</div><div class="msg" id="lmsg"></div><div class="row"><button class="btn" data-act="pwsave">Badlein</button><button class="btn sec" data-act="pwpanel">Rehne dein</button></div></div>' : '') +
       '<h2>' + P.monthName(S.month) + ' ka saar</h2>' + summary() +
       (S.view.pendingHazri ? '<div class="note warn">' + S.view.pendingHazri + ' candidate ki hazri admin ke approval me hai. Approve hone tak ye admin ke hisaab me nahi judti.</div>' : '') +
-      (pendingCands() ? '<div class="note warn">' + pendingCands() + ' candidate ka approval baaki hai. "Candidates" tab me approve karein, tabhi hazri bhar paayenge.</div>' : '');
+      (pendingCands() ? '<div class="note warn">' + pendingCands() + ' candidate ka approval baaki hai. "Candidates" tab me approve karein, tabhi hazri bhar paayenge.</div>' : '') +
+      partyModes();
+  }
+  /* party kis tarah kaam deti hai: staff ko tarika aur "kya karna hai" dikhta hai (rate / bill nahi) */
+  var MODEL_ST = {
+    labour: ['Labour supply + commission', 'Labour ki payment party tay karti hai. Hazri roz bharein. Daily Kaam (naap) is party ke liye nahi likhna.'],
+    measure: ['Naap / wazan / length ka kaam', 'Labour ki payment company tay karti hai. Hazri bharein aur "Daily Kaam" me roz ka naap aur labour likhein; party ka bill usi se banta hai.'],
+    '': ['Tarika abhi admin ne tay nahi kiya', 'Pehle jaisa chalta hai: hazri roz bharein. Poochhna ho to Admin se kahein.']
+  };
+  function partyModes() {
+    var ps = (S.view.parties || []); if (!ps.length) return '';
+    return '<h3>Party kis tarah kaam deti hai</h3><div class="card scroll"><table><thead><tr><th>Party</th><th>Tarika</th><th>Aapko kya karna hai</th></tr></thead><tbody>' + ps.map(function (p) { var m = MODEL_ST[p.model || ''] || MODEL_ST['']; return '<tr><td>' + esc(p.name) + '</td><td><span class="pill ' + (p.model === 'labour' ? 'good' : p.model === 'measure' ? 'warn' : '') + '">' + esc(m[0]) + '</span></td><td class="sm">' + esc(m[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>';
   }
 
   /* ---------- Candidates ---------- */

@@ -152,7 +152,7 @@
       ctx: function () {
         var d = S.data, cat = d.catalog || [], sites = [], seen = {}, teams = {};
         (d.worklogs || []).forEach(function (l) { var k = l.partyId + '|' + l.site; if (!seen[k]) { seen[k] = 1; sites.push({ partyId: l.partyId, site: l.site }); } teams[l.team] = 1; });
-        return { parties: d.parties, works: cat.filter(function (x) { return x.kind === 'work'; }), labour: cat.filter(function (x) { return x.kind === 'labour'; }), sites: sites, teams: Object.keys(teams), today: d.today, catalog: cat, staff: d.staff,
+        return { parties: d.parties.filter(function (p) { return p.model !== 'labour'; }), works: cat.filter(function (x) { return x.kind === 'work'; }), labour: cat.filter(function (x) { return x.kind === 'labour'; }), sites: sites, teams: Object.keys(teams), today: d.today, catalog: cat, staff: d.staff,
           rateOf: function (wid, pid) { var p = d.parties.filter(function (x) { return x.id === pid; })[0], o = (p && p.workRates || []).filter(function (r) { return r.workId === wid; })[0], w = cat.filter(function (x) { return x.id === wid; })[0]; return o ? +o.rate || 0 : (w ? +w.rate || 0 : 0); },
           lrate: function (id) { var w = cat.filter(function (x) { return x.id === id; })[0]; return w ? +w.rate || 0 : 0; } };
       },
@@ -170,6 +170,10 @@
   workHost();
 
   /* party ka commission kise jata hai */
+  function modelLine(p) {
+    if (!p.model) return '<div class="note warn xs">Kaam ka tarika tay nahi hai (labour + commission ya naap ka kaam). "Edit / Rate card" me chunein.</div>';
+    return '<div class="xs"><span class="pill ' + (p.model === 'labour' ? 'good' : 'warn') + '">' + esc(MODEL_TXT[p.model]) + '</span> ' + (p.model === 'labour' ? 'Labour ki payment party tay karti hai; hume commission milti hai.' : 'Labour ki payment hum tay karte hain; bill kaam ki keemat (Daily Kaam) se banta hai' + (S.data.workValue && S.data.workValue[p.id] != null ? ': is mahine ' + inr(S.data.workValue[p.id]) : '') + '.') + '</div>';
+  }
   function commLine(p) {
     if (!Array.isArray(p.commTo)) return '<div class="note warn xs">Is party ka commission kise jaye ye tay nahi hai (abhi sabhi staff ko ja raha hai). "Edit / Rate card" me chunein.</div>';
     var names = p.commTo.map(function (id) { var s = S.data.staff.filter(function (x) { return x.id === id; })[0]; return s ? s.name : ''; }).filter(Boolean);
@@ -184,7 +188,7 @@
         (p.due > 0 ? '<span class="pill ' + (p.overdueDays ? 'red' : 'warn') + '">Baaki ' + inr(p.due) + (p.overdueDays ? ' · ' + p.overdueDays + ' din late' : '') + '</span>' : (p.receivable > 0 ? '<span class="pill good">Poora mila</span>' : '')) + '</div></div>' +
         '<div class="trades">' + P.tradeLine(p.trades) + ' <span class="mu">(kul ' + p.headcount + ')</span></div>' +
         '<div class="cards">' + mini('Company bill', inr(p.bill)) + mini('Company commission', inr(p.bonus)) + mini('Milna chahiye', inr(p.receivable)) + mini('Mil chuka', inr(p.received)) + mini('Baaki', inr(p.due)) + '</div>' +
-        commLine(raw) +
+        modelLine(raw) + commLine(raw) +
         (rem ? '<div class="xs mu">Aakhri reminder: ' + esc(P.dt(rem.at)) + ' (' + esc(rem.channel) + ')</div>' : '') +
         '<div class="row"><button class="btn sm sec" data-act="open" data-id="' + p.id + '">' + (S.open[p.id] ? 'Candidates chhupayein' : 'Candidates dekhein') + '</button><button class="btn sm sec" data-act="panel" data-k="party" data-id="' + p.id + '">Edit / Rate card</button><button class="btn sm sec" data-act="panel" data-k="receipt" data-id="' + p.id + '">Payment mila</button><button class="btn sm sec" data-act="panel" data-k="remind" data-id="' + p.id + '">Reminder</button><button class="btn sm sec" data-act="xparty" data-id="' + p.id + '">Excel</button></div>';
       if (S.open[p.id]) h += partyTable(p.id);
@@ -468,7 +472,7 @@
     var d = S.data, att = {}, m = d.month;
     d.candidates.forEach(function (c) { var a = d.attendance[c.id]; if (a && !a.pending) { att[c.id] = {}; att[c.id][m] = { days: a.days }; } });
     Object.keys(dr.dirty).forEach(function (cid) { att[cid] = {}; att[cid][m] = { days: hzDays(dr.marks[cid], dim(m)) }; });
-    return A2ZPayout.compute({ month: m, settings: d.settings, parties: d.parties, staff: d.staff, candidates: d.candidates.filter(function (c) { return c.approval === 'approved'; }), attendance: att, expenses: d.expenses, partners: d.partners, receipts: d.receipts, asOf: d.today });
+    return A2ZPayout.compute({ month: m, settings: d.settings, parties: d.parties, staff: d.staff, candidates: d.candidates.filter(function (c) { return c.approval === 'approved'; }), attendance: att, workValue: d.workValue, expenses: d.expenses, partners: d.partners, receipts: d.receipts, asOf: d.today });
   }
   V.hazri = function () {
     var d = S.data, pid = hzActiveParty(), n = dim(S.month);
@@ -568,8 +572,24 @@
 
   /* ---------- forms (panels) ---------- */
   function rateRow(r) {
-    r = r || { trade: '', bill: '', pay: '' };
-    return '<tr><td><input class="r-trade" value="' + esc(r.trade) + '" placeholder="Trade (jaise Fitter)" aria-label="Trade"></td><td><input class="r-bill" type="number" min="0" step="any" value="' + esc(r.bill) + '" aria-label="Company deti hai"></td><td><input class="r-pay" type="number" min="0" step="any" value="' + esc(r.pay) + '" aria-label="Candidate ko"></td><td><button type="button" class="link danger" data-act="delrate">Hatayein</button></td></tr>';
+    r = r || { trade: '', bill: '', pay: '', comm: '' };
+    return '<tr><td><input class="r-trade" value="' + esc(r.trade) + '" placeholder="Trade (jaise Fitter)" aria-label="Trade"></td><td class="c-bill"><input class="r-bill" type="number" min="0" step="any" value="' + esc(r.bill) + '" aria-label="Company deti hai"></td><td><input class="r-pay" type="number" min="0" step="any" value="' + esc(r.pay) + '" aria-label="Candidate ko"></td><td class="c-comm"><input class="r-comm" type="number" min="0" step="any" value="' + esc(r.comm == null ? '' : r.comm) + '" aria-label="Hamara commission"></td><td><button type="button" class="link danger" data-act="delrate">Hatayein</button></td></tr>';
+  }
+  /* party ka kaam ka tarika: labour supply (payment party tay karti hai, hume commission) ya naap ka kaam (payment hum tay karte hain) */
+  var MODEL_TXT = { labour: 'Labour supply + commission', measure: 'Naap / wazan / length ka kaam' };
+  function modelBox(p) {
+    return '<div class="card span-all"><h4>Ye party kis tarah kaam deti hai?</h4>' +
+      '<label>Kaam ka tarika<select name="model"><option value=""' + (!p.model ? ' selected' : '') + '>Abhi tay nahi (purana tarika: hazri x rate)</option><option value="labour"' + (p.model === 'labour' ? ' selected' : '') + '>1) Labour hamse leti hai aur hume commission deti hai</option><option value="measure"' + (p.model === 'measure' ? ' selected' : '') + '>2) Labour hamse leti hai par kaam naap / wazan / length ke hisaab se deti hai</option></select></label>' +
+      '<div class="note m-none">Tarika chunne se hisaab sahi ban-ta hai. Purani party me jab tak nahi chunte, purana hazri x rate wala hisaab chalta hai aur Overview par chetavani dikhti hai.</div>' +
+      '<div class="note m-labour"><b>1) Labour + commission:</b> labour ki payment (mistri / mazdoor ko kitna) <b>party tay karti hai</b>. Hume party se us payment ke upar <b>commission</b> milti hai. Neeche rate card me "Candidate ko" = party ki tay ki hui labour payment, "Hamara commission" = hume jo milta hai. Party ka bill apne-aap = payment + commission. Candidate ki payment party ki tay payment se alag likhne par chetavani aati hai. Staff ko ye tarika dikhta hai par rate / bill nahi.</div>' +
+      '<div class="note m-measure"><b>2) Naap ka kaam:</b> party kaam <b>length / wazan / m3 jaise naap</b> se deti hai. Labour ki payment <b>hum tay karte hain</b> (rate card me "Candidate ko"). Party ko bill <b>kaam ki keemat</b> se banta hai: Daily Kaam me staff jo naap likhta hai x neeche likha party ka rate. Hazri ke din se party ka bill nahi banta; labour ko payment hazri se hi milti hai. Mahine ka bill = us mahine ke Daily Kaam ki keemat ("sudhar karein" wali entry chhodkar).</div>' +
+      '<label class="m-labour">Commission kaise milta hai<select name="commKind"><option value="amt"' + (p.commKind !== 'pct' ? ' selected' : '') + '>Fixed rupaye (' + unit() + ')</option><option value="pct"' + (p.commKind === 'pct' ? ' selected' : '') + '>Payment ka % (jaise 10%)</option></select></label></div>';
+  }
+  /* labour supply: company ka rate = party ki payment + hamara commission (apne-aap) */
+  function rcAuto(fm) {
+    if (!fm || !fm.dataset || fm.dataset.model !== 'labour') { $$('.r-bill', fm || document).forEach(function (i) { i.readOnly = false; }); return; }
+    var pct = fm.elements.commKind && fm.elements.commKind.value === 'pct';
+    $$('#rateRows tr', fm).forEach(function (tr) { var pay = parseFloat($('.r-pay', tr).value) || 0, c = parseFloat($('.r-comm', tr).value) || 0, b = $('.r-bill', tr); b.readOnly = true; b.value = Math.round((pay + (pct ? pay * c / 100 : c)) * 100) / 100; });
   }
   function partyCommBox(p) {
     var set = Array.isArray(p.commTo), st = S.data.staff.filter(function (x) { return x.active !== false; });
@@ -587,12 +607,13 @@
   var PANELS = {
     party: function (id) {
       var p = id ? party(id) : { name: '', phone: '', contact: '', address: '', gstin: '', billPct: '', basisDays: '', payDays: '', rates: [], active: true };
-      return '<h3>' + (id ? 'Party edit' : 'Nayi party') + '</h3><form data-form="party" class="grid"><input type="hidden" name="id" value="' + esc(id || '') + '">' + fld('name', 'Party / Company ka naam', p.name, { req: 1 }) + fld('contact', 'Contact person', p.contact) + fld('phone', 'Mobile', p.phone, { type: 'tel' }) + fld('email', 'Email (reminder ke liye)', p.email, { type: 'email' }) + fld('gstin', 'GSTIN', p.gstin) + fld('address', 'Pata', p.address) +
+      return '<h3>' + (id ? 'Party edit' : 'Nayi party') + '</h3><form data-form="party" class="grid" data-model="' + esc(p.model || '') + '"><input type="hidden" name="id" value="' + esc(id || '') + '">' + fld('name', 'Party / Company ka naam', p.name, { req: 1 }) + fld('contact', 'Contact person', p.contact) + fld('phone', 'Mobile', p.phone, { type: 'tel' }) + fld('email', 'Email (reminder ke liye)', p.email, { type: 'email' }) + fld('gstin', 'GSTIN', p.gstin) + fld('address', 'Pata', p.address) +
         fld('billPct', 'Is party ka commission % (khali = default)', p.billPct, { type: 'number', step: 'any', min: 0, max: 100 }) + fld('basisDays', 'Mahine ke din (sirf mahine-wale rate me)', p.basisDays, { type: 'number', min: 1, max: 31 }) + fld('payDays', 'Payment ke din (khali = default)', p.payDays, { type: 'number', min: 0 }) +
         sel('active', 'Halat', [['true', 'Chalu'], ['false', 'Band']], String(p.active !== false)) +
-        '<div class="note">Rate card: har trade ka rate (' + unit() + '). "Company deti hai" = company se kitna milta hai. "Candidate ko" = candidate ko kitna dena hai.</div>' +
-        '<div class="scroll"><table><thead><tr><th>Trade</th><th>Company deti hai (' + unit() + ')</th><th>Candidate ko (' + unit() + ')</th><th></th></tr></thead><tbody id="rateRows">' + (p.rates.length ? p.rates : [null]).map(rateRow).join('') + '</tbody></table></div>' +
-        partyCommBox(p) + partyWorkBox(p) +
+        modelBox(p) +
+        '<div class="note span-all"><span class="m-none">Rate card: har trade ka rate (' + unit() + '). "Company deti hai" = company se kitna milta hai. "Candidate ko" = candidate ko kitna dena hai.</span><span class="m-labour">Rate card: "Candidate ko" = party ki tay ki hui labour payment, "Hamara commission" = hume milne wala. "Company deti hai" apne-aap banta hai.</span><span class="m-measure">Rate card: "Candidate ko" = labour ko jo payment hum tay karte hain (' + unit() + '). Party ka bill rate yahan nahi, kaam ke rate se banta hai (neeche).</span></div>' +
+        '<div class="scroll span-all"><table><thead><tr><th>Trade</th><th class="c-bill">Company deti hai (' + unit() + ')</th><th>Candidate ko (' + unit() + ')</th><th class="c-comm">Hamara commission</th><th></th></tr></thead><tbody id="rateRows">' + (p.rates.length ? p.rates : [null]).map(rateRow).join('') + '</tbody></table></div>' +
+        partyCommBox(p) + '<div class="m-work span-all">' + partyWorkBox(p) + '</div>' +
         '<div class="row"><button type="button" class="btn sm sec" data-act="addrate">+ Trade</button></div><div class="msg" id="msg" role="alert"></div><div class="row"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="closepanel">Band karein</button></div></form>';
     },
     staff: function (id) {
@@ -657,8 +678,8 @@
     otp: async function (f) { var o = collect(f); await api('POST', '/api/admin/verify', { challenge: S.challenge, otp: o.otp }); S.challenge = null; await load(); },
     secsite: async function (f) { var o = collect(f), r = await api('POST', '/api/admin/sec-action', { act: 'baseline', url: o.url }); P.toast(r.msg); await secLoad(); },
     party: async function (f) {
-      var o = collect(f), rates = $$('#rateRows tr', f).map(function (tr) { return { trade: $('.r-trade', tr).value, bill: $('.r-bill', tr).value, pay: $('.r-pay', tr).value }; }).filter(function (r) { return r.trade.trim(); });
-      var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates };
+      var o = collect(f), rates = $$('#rateRows tr', f).map(function (tr) { return { trade: $('.r-trade', tr).value, bill: $('.r-bill', tr).value, pay: $('.r-pay', tr).value, comm: $('.r-comm', tr).value }; }).filter(function (r) { return r.trade.trim(); });
+      var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates, model: o.model || '', commKind: o.commKind || 'amt' };
       item.commTo = o.ct_set === 'set' ? $$('.ct-box', f).filter(function (x) { return x.checked; }).map(function (x) { return x.value; }) : null;
       item.workRates = $$('.wr', f).filter(function (x) { return x.value !== ''; }).map(function (x) { return { workId: x.dataset.id, rate: x.value }; });
       if (o.id) item.id = o.id; await save('parties', item);
@@ -713,6 +734,7 @@
     var ae = document.activeElement, keep = ae && ae.id === 'fq' ? ae.selectionStart : null;
     $('#app').innerHTML = pn + secBanner() + V[S.tab]();
     if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'admin', { quick: ['a-setup', 'a-cand-admin', 'a-hazri', 'a-paid', 'a-money', 'a-staff-approve', 'a-excel'], hello: 'Admin ke saare kaam: staff / candidate approve karna, hazri, advance, kise kitna chukaya, owners ka hissa, Excel, backup. Apna sawal likhein ya chunein.' });
+    if (S.panel && S.panel.k === 'party') { var pf = $('form[data-form=party]'); if (pf) rcAuto(pf); }
     if (S.panel) { var el = $('#panel'); if (el && S.panel.fresh) { el.scrollIntoView({ block: 'nearest' }); S.panel.fresh = false; } }
     if (S.hzKeep != null) { var hs = $('#hzs'); if (hs) hs.scrollLeft = S.hzKeep; S.hzKeep = null; }
     if (keep !== null) { var q = $('#fq'); if (q) { q.focus(); q.setSelectionRange(keep, keep); } }
@@ -883,7 +905,7 @@
     },
     addfix: function (b) { $('.fixRows', b.closest('.commbox')).insertAdjacentHTML('beforeend', fixRow()); },
     delfix: function (b) { var tb = b.closest('tbody'), tr = b.closest('tr'); if ($$('tr', tb).length > 1) tr.remove(); else $$('input', tr).forEach(function (i) { i.value = ''; }); },
-    addrate: function () { $('#rateRows').insertAdjacentHTML('beforeend', rateRow()); },
+    addrate: function () { $('#rateRows').insertAdjacentHTML('beforeend', rateRow()); rcAuto($('#rateRows').closest('form')); },
     delrate: function (b) { var tr = b.closest('tr'); if ($$('#rateRows tr').length > 1) tr.remove(); else $$('input', tr).forEach(function (i) { i.value = ''; }); },
     copytext: function () { P.copy($('#remText').value); },
     logwa: function (b) { api('POST', '/api/admin/reminder', { partyId: b.dataset.id, month: S.month, channel: 'whatsapp' }).then(load).catch(function () { /* the link still opens */ }); },
@@ -947,11 +969,13 @@
     if (t.classList.contains('doc-file') && t.files && t.files[0]) { var dk = t.dataset.doc, df = t.files[0]; t.value = ''; P.photoFromFile(df, { kind: 'doc' }).then(function (u) { S.pdocs[dk] = u; docRefresh(); }, function (x) { if (x.message !== 'cancel') P.toast(x.message); }); return; }
     if (t.id === 'pfile' && t.files && t.files[0]) { P.photoFromFile(t.files[0], { kind: 'photo' }).then(function (u) { S.pph = u; var pb = $('#pbox'); if (pb) pb.innerHTML = '<img alt="photo" src="' + esc(u) + '">'; }, function (x) { P.toast(x.message); }); t.value = ''; return; }
     if (t.classList.contains('cm-sel')) { commShow(t.closest('.commbox')); return; }
+    if (t.name === 'model' || t.name === 'commKind') { var fm = t.form; if (fm) { if (t.name === 'model') fm.dataset.model = t.value; rcAuto(fm); } return; }
     if (t.classList.contains('js-days')) {
       guard(async function () { await api('POST', '/api/admin/attendance', { candId: t.dataset.id, month: S.month, days: t.value || 0 }); await load(); P.toast('Din save ho gaye'); })();
     } else if (t.name === 'fparty') { S.f.party = t.value; render(); } else if (t.name === 'fstaff') { S.f.staff = t.value; render(); } else if (t.name === 'hzp') { S.hzParty = t.value; S.hz = null; render(); }
   });
   document.addEventListener('input', function (e) {
+    if (e.target && (e.target.classList.contains('r-pay') || e.target.classList.contains('r-comm'))) { rcAuto(e.target.form); return; }
     if (e.target && e.target.id === 'idq') { S.idq = e.target.value; clearTimeout(S.idT); S.idT = setTimeout(function () { var rs = $('#idres'); if (rs) rs.innerHTML = idRows(S.idq); }, 100); return; }
     var t = e.target;
     if (t.id === 'fq') {
