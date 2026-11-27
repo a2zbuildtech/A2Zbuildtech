@@ -3,9 +3,10 @@
 (function () {
   'use strict';
   var $ = P.$, $$ = P.$$, esc = P.esc, inr = P.inr, nf = P.nf, api = P.api;
-  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {}, master: { d: null, st: {} } };
+  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {}, master: { d: null, st: { pm: P.thisMonth() } } };
   var TABS = [['dash', 'Overview'], ['master', 'Poora Dashboard'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
-  var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
+  var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor', office: 'Office staff' };
+  var WHERE = function (t) { return t === 'office' ? '<span class="pill good">Office staff</span>' : t === 'supplier' ? '<span class="pill">Manpower supplier</span>' : '<span class="pill warn">Site / Jagah ka staff</span>'; };
   var CMODE = { percent: 'Percent (%)', fixed: 'Fixed rate (trade-wise)', none: 'Koi hissa nahi (admin tay karega)' };
   function cmLabel(x) {
     if (x.commMode === 'percent') return x.pct + '%';
@@ -141,14 +142,15 @@
     var m = S.master; if (!m.d) return '<h2>Poora Dashboard</h2><div class="note">' + (m.err ? esc(m.err) : 'Shuru se aaj tak ka hisaab la raha hoon...') + '</div>';
     return window.A2ZMaster.html(m.d, m.st);
   };
-  async function masterLoad() { S.master.err = ''; try { S.master.d = await api('POST', '/api/admin/master', {}); } catch (e) { S.master.d = null; S.master.err = e.message; } render(); }
+  function masterPer() { var st = S.master.st, b = st.pm && st.pm !== 'custom' ? window.A2ZMaster.bounds(st.pm) : [st.pf || '', st.pt || '']; return { from: b[0], to: b[1] }; }
+  async function masterLoad() { S.master.err = ''; try { S.master.d = await api('POST', '/api/admin/master', masterPer()); } catch (e) { S.master.d = null; S.master.err = e.message; } render(); }
   function masterRes() { var r = $('#mres'); if (r && S.master.d) r.innerHTML = window.A2ZMaster.results(S.master.d, S.master.st); }
 
   /* ---------- Duty / Location ---------- */
   var dutyT = null;
   V.duty = function () {
     if (!dutyT) dutyT = setInterval(function () { if (S.tab === 'duty' && !document.hidden && S.data && !S.dstate.close) load().catch(function () {}); }, 60000);
-    return window.A2ZDuty.adminHtml(S.data.duty || { records: [], open: [] }, S.data.staff, { month: S.month, view: S.dstate.view, close: S.dstate.close });
+    return window.A2ZDuty.adminHtml(S.data.duty || { records: [], open: [] }, S.data.staff, { month: S.month, view: S.dstate.view, close: S.dstate.close, pay: (S.data.report && S.data.report.byStaff) || [] });
   };
 
   /* ---------- Daily Kaam ---------- */
@@ -180,10 +182,10 @@
   /* party ka commission kise jata hai */
   function modelLine(p) {
     if (!p.model) return '<div class="note warn xs">Kaam ka tarika tay nahi hai (labour + commission ya naap ka kaam). "Edit / Rate card" me chunein.</div>';
-    return '<div class="xs"><span class="pill ' + (p.model === 'labour' ? 'good' : 'warn') + '">' + esc(MODEL_TXT[p.model]) + '</span> ' + (p.model === 'labour' ? 'Labour ki payment party tay karti hai; hume commission milti hai.' : 'Labour ki payment hum tay karte hain; bill kaam ki keemat (Daily Kaam) se banta hai' + (S.data.workValue && S.data.workValue[p.id] != null ? ': is mahine ' + inr(S.data.workValue[p.id]) : '') + '.') + '</div>';
+    return '<div class="xs"><span class="pill ' + (p.model === 'labour' ? 'good' : 'warn') + '">' + esc(MODEL_TXT[p.model]) + '</span> ' + (p.model === 'labour' ? (p.labourPaidBy === 'party' ? 'Party seedha labour ko payment deti hai; hume sirf commission milta hai.' : 'Labour ki payment party tay karti hai; company deti hai, hume commission milti hai.') : 'Labour ki payment hum tay karte hain; bill kaam ki keemat (Daily Kaam) se banta hai' + (S.data.workValue && S.data.workValue[p.id] != null ? ': is mahine ' + inr(S.data.workValue[p.id]) : '') + '.') + '</div>';
   }
   function commLine(p) {
-    if (!Array.isArray(p.commTo)) return '<div class="note warn xs">Is party ka commission kise jaye ye tay nahi hai (abhi sabhi staff ko ja raha hai). "Edit / Rate card" me chunein.</div>';
+    if (!Array.isArray(p.commTo)) return '<div class="note warn xs">Is party ka commission kise jaye ye tay nahi hai, isliye abhi kisi staff ko commission nahi ja raha. "Edit / Rate card" me staff chunein.</div>';
     var names = p.commTo.map(function (id) { var s = S.data.staff.filter(function (x) { return x.id === id; })[0]; return s ? s.name : ''; }).filter(Boolean);
     return '<div class="xs">Commission jata hai: ' + (names.length ? '<b>' + esc(names.join(', ')) + '</b>' : '<b>kisi ko nahi</b> (poora hissa company ka)') + '</div>';
   }
@@ -219,7 +221,7 @@
       '<div class="card"><span class="lbl">Staff registration + login page</span><div class="link-box">' + esc(location.origin + location.pathname.replace(/[^\/]*$/, '') + 'staff.html') + '</div><div class="row"><button class="btn sm" data-act="copyreg">Copy</button></div></div>';
     d.staff.forEach(function (s) {
       var m = r.byStaff.filter(function (x) { return x.id === s.id; })[0], url = link(s);
-      h += '<div class="card"><div class="row between"><div><h3>' + esc(s.name) + ' <span class="b">' + esc(s.serial || '') + '</span> ' + (s.regStatus === 'pending' ? '<span class="pill warn">approval baaki</span> ' : s.regStatus === 'rejected' ? '<span class="pill bad">reject</span> ' : '') + (s.hasPass ? '' : '<span class="pill">password set nahi</span> ') + (s.active === false ? '<span class="pill">band</span>' : '') + '</h3><div class="sm mu">' + esc(TYPE[s.type] || s.type) + ' · Commission <b>' + esc(cmLabel(m)) + '</b> · ' + esc(s.phone) + (m.fixed ? ' · Fixed ' + inr(m.fixed) + '/mahina' : '') + '</div></div></div>' +
+      h += '<div class="card"><div class="row between"><div><h3>' + esc(s.name) + ' <span class="b">' + esc(s.serial || '') + '</span> ' + (s.regStatus === 'pending' ? '<span class="pill warn">approval baaki</span> ' : s.regStatus === 'rejected' ? '<span class="pill bad">reject</span> ' : '') + (s.hasPass ? '' : '<span class="pill">password set nahi</span> ') + (s.active === false ? '<span class="pill">band</span>' : '') + '</h3><div class="sm mu">' + WHERE(s.type) + ' ' + (s.type === 'office' ? 'Office 9:00-18:00, commission nahi' : 'Commission <b>' + esc(cmLabel(m)) + '</b>') + ' · ' + esc(s.phone) + (m.fixed ? ' · Fixed ' + inr(m.fixed) + '/mahina' : '') + '</div></div></div>' +
         '<div class="link-box" data-link="' + s.id + '">' + esc(url) + '</div>' +
         '<div class="row"><button class="btn sm" data-act="staffid" data-id="' + s.id + '">ID card</button><button class="btn sm sec" data-act="panel" data-k="staffpw" data-id="' + s.id + '">Password set</button><button class="btn sm sec" data-act="copylink" data-id="' + s.id + '">Link copy</button><a class="btn sm sec" target="_blank" rel="noopener" href="' + esc(P.waLink(s.phone, 'A2Z Build Tech: aapka entry aur hisaab ka link: ' + url)) + '">WhatsApp par bhejein</a><button class="btn sm sec" data-act="newtoken" data-id="' + s.id + '">Naya link (purana band)</button><button class="btn sm sec" data-act="panel" data-k="staff" data-id="' + s.id + '">Edit</button><button class="btn sm sec" data-act="open" data-id="' + s.id + '">Hisaab ' + (S.open[s.id] ? 'chhupayein' : 'dekhein') + '</button></div>' +
         '<div class="cards">' + mini('Candidates', m.candidates) + mini('Kul din', nf(m.days)) + mini('Candidates ka wage', inr(m.pay)) + mini('Commission', inr(m.commission)) + mini('GST (' + d.settings.gstPct + '%)', inr(m.gst)) + mini('Staff ko milega', inr(m.net)) + '</div>';
@@ -591,7 +593,8 @@
       '<div class="note m-none">Tarika chunne se hisaab sahi ban-ta hai. Purani party me jab tak nahi chunte, purana hazri x rate wala hisaab chalta hai aur Overview par chetavani dikhti hai.</div>' +
       '<div class="note m-labour"><b>1) Labour + commission:</b> labour ki payment (mistri / mazdoor ko kitna) <b>party tay karti hai</b>. Hume party se us payment ke upar <b>commission</b> milti hai. Neeche rate card me "Candidate ko" = party ki tay ki hui labour payment, "Hamara commission" = hume jo milta hai. Party ka bill apne-aap = payment + commission. Candidate ki payment party ki tay payment se alag likhne par chetavani aati hai. Staff ko ye tarika dikhta hai par rate / bill nahi.</div>' +
       '<div class="note m-measure"><b>2) Naap ka kaam:</b> party kaam <b>length / wazan / m3 jaise naap</b> se deti hai. Labour ki payment <b>hum tay karte hain</b> (rate card me "Candidate ko"). Party ko bill <b>kaam ki keemat</b> se banta hai: Daily Kaam me staff jo naap likhta hai x neeche likha party ka rate. Hazri ke din se party ka bill nahi banta; labour ko payment hazri se hi milti hai. Mahine ka bill = us mahine ke Daily Kaam ki keemat ("sudhar karein" wali entry chhodkar).</div>' +
-      '<label class="m-labour">Commission kaise milta hai<select name="commKind"><option value="amt"' + (p.commKind !== 'pct' ? ' selected' : '') + '>Fixed rupaye (' + unit() + ')</option><option value="pct"' + (p.commKind === 'pct' ? ' selected' : '') + '>Payment ka % (jaise 10%)</option></select></label></div>';
+      '<label class="m-labour">Commission kaise milta hai<select name="commKind"><option value="amt"' + (p.commKind !== 'pct' ? ' selected' : '') + '>Fixed rupaye (' + unit() + ')</option><option value="pct"' + (p.commKind === 'pct' ? ' selected' : '') + '>Payment ka % (jaise 10%)</option></select></label>' +
+      '<label class="m-labour">Labour ki payment kaun deti hai<select name="labourPaidBy"><option value=""' + (p.labourPaidBy !== 'party' ? ' selected' : '') + '>Company deti hai (party hume pay + commission deti hai)</option><option value="party"' + (p.labourPaidBy === 'party' ? ' selected' : '') + '>Party seedha labour ko deti hai (hume sirf commission milta hai)</option></select></label></div>';
   }
   /* labour supply: company ka rate = party ki payment + hamara commission (apne-aap) */
   function rcAuto(fm) {
@@ -602,7 +605,7 @@
   function partyCommBox(p) {
     var set = Array.isArray(p.commTo), st = S.data.staff.filter(function (x) { return x.active !== false; });
     return '<div class="card span-all" id="commToBox"><h4>Is party ka commission kise jaye?</h4><div class="note">Jin staff ko chunenge sirf unhi ko is party ke candidates ka commission jayega. Baaki staff ko is party se commission nahi milega (poora hissa company ka rahega). Ye staff ki apni commission setting ke upar lagta hai.</div>' +
-      '<label>Faisla<select name="ct_set"><option value=""' + (set ? '' : ' selected') + '>Abhi tay nahi (purane tarike se sabko jayega)</option><option value="set"' + (set ? ' selected' : '') + '>Sirf neeche chune hue staff ko (kisi ko na chunein = kisi ko nahi)</option></select></label>' +
+      '<label>Faisla<select name="ct_set"><option value=""' + (set ? '' : ' selected') + '>Abhi tay nahi (kisi ko commission nahi jayega)</option><option value="set"' + (set ? ' selected' : '') + '>Sirf neeche chune hue staff ko (kisi ko na chunein = kisi ko nahi)</option></select></label>' +
       '<div class="row">' + (st.length ? st.map(function (x) { return '<label class="row"><input type="checkbox" class="ct-box" value="' + esc(x.id) + '"' + (set && p.commTo.indexOf(x.id) >= 0 ? ' checked' : '') + '> ' + esc(x.name) + '</label>'; }).join('') : '<span class="mu">Abhi koi staff nahi.</span>') + '</div></div>';
   }
   function partyWorkBox(p) {
@@ -626,9 +629,9 @@
     },
     staff: function (id) {
       var s = id ? staff(id) : { name: '', phone: '', type: 'agent', commMode: '', fixedRates: [], commissionPct: '', fixedPay: '', fixedFrom: '', active: true, email: '' };
-      return '<h3>' + (id ? 'Staff edit' : 'Naya staff') + '</h3><form data-form="staff" class="grid"><input type="hidden" name="id" value="' + esc(id || '') + '">' + fld('name', 'Naam', s.name, { req: 1 }) + fld('phone', 'Mobile', s.phone, { type: 'tel' }) + fld('email', 'Email', s.email, { type: 'email' }) +
-        sel('type', 'Prakar', [['agent', 'Staff (candidate laata hai)'], ['supplier', 'Manpower supplier (company me kaam nahi karta)'], ['supervisor', 'Site supervisor (fixed payment)']], s.type) +
-        commBox(s, S.data.settings.commissionPct) + fld('fixedPay', 'Fixed payment / salary \u20b9 per mahina (company staff ke liye; commission iske saath alag se milega. Manpower supplier ke liye 0)', s.fixedPay, { type: 'number', min: 0, step: 'any' }) + fld('fixedFrom', 'Fixed payment kis mahine se', s.fixedFrom, { type: 'month' }) +
+      return '<h3>' + (id ? 'Staff edit' : 'Naya staff') + '</h3><form data-form="staff" class="grid" data-type="' + esc(s.type || 'agent') + '"><input type="hidden" name="id" value="' + esc(id || '') + '">' + fld('name', 'Naam', s.name, { req: 1 }) + fld('phone', 'Mobile', s.phone, { type: 'tel' }) + fld('email', 'Email', s.email, { type: 'email' }) +
+        sel('type', 'Prakar', [['agent', 'Site staff (candidate laata hai)'], ['office', 'Office staff (09:00 am - 06:00 pm, commission nahi)'], ['supplier', 'Manpower supplier (company me kaam nahi karta)'], ['supervisor', 'Site supervisor (fixed payment)']], s.type) +
+        '<div class="span-all m-nonoffice">' + commBox(s, S.data.settings.commissionPct) + '</div><div class="note span-all m-office">Office staff ka samay subah 09:00 se shaam 06:00. Inhe commission nahi milta, sirf neeche ki salary. IN / OUT (selfie) wahi niyam: 9 ghante baad OUT = poori duty.</div>' + fld('fixedPay', 'Fixed payment / salary \u20b9 per mahina (company staff ke liye; commission iske saath alag se milega. Manpower supplier ke liye 0)', s.fixedPay, { type: 'number', min: 0, step: 'any' }) + fld('fixedFrom', 'Fixed payment kis mahine se', s.fixedFrom, { type: 'month' }) + sel('payBasis', 'Salary kaise banegi', [['duty', 'Duty ke din ke hisaab se (salary \u00f7 26 \u00d7 duty ke din)'], ['full', 'Poore mahine ki (din se farak nahi)']], id ? (s.payBasis || 'full') : 'duty') +
         sel('active', 'Halat', [['true', 'Chalu'], ['false', 'Band (login / link bhi band)']], String(s.active !== false)) + personFields(s) +
         '<div class="span-all">' + photoBox(S.pph, 'Photo (ID card ke liye)') + '</div>' + P.docSlots(id ? s.docKeys : [], S.pdocs, !!id) + '<div class="msg" id="msg" role="alert"></div><div class="row"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="closepanel">Band karein</button></div></form>';
     },
@@ -687,13 +690,13 @@
     secsite: async function (f) { var o = collect(f), r = await api('POST', '/api/admin/sec-action', { act: 'baseline', url: o.url }); P.toast(r.msg); await secLoad(); },
     party: async function (f) {
       var o = collect(f), rates = $$('#rateRows tr', f).map(function (tr) { return { trade: $('.r-trade', tr).value, bill: $('.r-bill', tr).value, pay: $('.r-pay', tr).value, comm: $('.r-comm', tr).value }; }).filter(function (r) { return r.trade.trim(); });
-      var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates, model: o.model || '', commKind: o.commKind || 'amt' };
+      var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates, model: o.model || '', commKind: o.commKind || 'amt', labourPaidBy: o.model === 'labour' && o.labourPaidBy === 'party' ? 'party' : 'company' };
       item.commTo = o.ct_set === 'set' ? $$('.ct-box', f).filter(function (x) { return x.checked; }).map(function (x) { return x.value; }) : null;
       item.workRates = $$('.wr', f).filter(function (x) { return x.value !== ''; }).map(function (x) { return { workId: x.dataset.id, rate: x.value }; });
       if (o.id) item.id = o.id; await save('parties', item);
     },
     staff: async function (f) {
-      var o = collect(f), item = { name: o.name, phone: o.phone, email: o.email, type: o.type, commissionPct: o.commissionPct, commMode: commRead(f).commMode, fixedRates: commRead(f).fixedRates, fixedPay: o.fixedPay, fixedFrom: o.fixedFrom, active: o.active === 'true', father: o.father, dob: o.dob, address: o.address, aadhaar: o.aadhaar, bank: o.bank, ifsc: o.ifsc, upi: o.upi };
+      var o = collect(f), item = { name: o.name, phone: o.phone, email: o.email, type: o.type, commissionPct: o.commissionPct, commMode: o.type === 'office' ? 'none' : commRead(f).commMode, fixedRates: o.type === 'office' ? [] : commRead(f).fixedRates, payBasis: o.payBasis, fixedPay: o.fixedPay, fixedFrom: o.fixedFrom, active: o.active === 'true', father: o.father, dob: o.dob, address: o.address, aadhaar: o.aadhaar, bank: o.bank, ifsc: o.ifsc, upi: o.upi };
       if (o.id) item.id = o.id; await save('staff', item, S.pph, S.pdocs);
     },
     cand: async function (f) {
@@ -848,7 +851,7 @@
     dclosex: function () { S.dstate.close = null; render(); },
     dclosego: async function (b) { var id = S.dstate.close; S.dstate.close = null; await api('POST', '/api/admin/duty-close', { id: id, count: b.dataset.c === '1', month: S.month }); await load(); P.toast('Duty band ho gayi'); },
     ddel: async function (b) { if (!window.confirm('Ye duty entry (selfie ke saath) hamesha ke liye hata dein?')) return; await api('POST', '/api/admin/duty-del', { id: b.dataset.id, month: S.month }); await load(); P.toast('Entry hata di'); },
-    xduty: function () { var d = S.data.duty || { records: [] }; if (!d.records.length) { P.toast('Is mahine koi duty nahi'); return; } xbook(window.A2ZDuty.sheets(d, S.data.staff, S.month), 'A2Z-duty'); },
+    xduty: function () { var d = S.data.duty || { records: [] }; xbook(window.A2ZDuty.sheets(d, S.data.staff, S.month, (S.data.report && S.data.report.byStaff) || []), 'A2Z-duty'); },
     xsup: function () { var L = supData(); if (!L.length) { P.toast('Koi manpower supplier nahi hai'); return; } xbook(supSheets(L), 'A2Z-supplier-hisaab'); },
     xsup1: function (b) { var L = supData().filter(function (x) { return x.s.id === b.dataset.id; }); if (L.length) xbook(supSheets(L), 'A2Z-supplier-' + (L[0].s.serial || 'x')); },
     docpend: function (b) { P.viewImage(S.pdocs[b.dataset.doc], 'Document'); },
@@ -980,8 +983,14 @@
     var t = e.target;
     if (t.classList.contains('doc-file') && t.files && t.files[0]) { var dk = t.dataset.doc, df = t.files[0]; t.value = ''; P.photoFromFile(df, { kind: 'doc' }).then(function (u) { S.pdocs[dk] = u; docRefresh(); }, function (x) { if (x.message !== 'cancel') P.toast(x.message); }); return; }
     if (t.id === 'pfile' && t.files && t.files[0]) { P.photoFromFile(t.files[0], { kind: 'photo' }).then(function (u) { S.pph = u; var pb = $('#pbox'); if (pb) pb.innerHTML = '<img alt="photo" src="' + esc(u) + '">'; }, function (x) { P.toast(x.message); }); t.value = ''; return; }
+    if (t.dataset && t.dataset.dset) { guard(async function () { var r = await api('POST', '/api/admin/duty-set', { id: t.dataset.dset, credit: Number(t.value), month: S.month }); await load(); P.toast('Ginti badal di'); })(); return; }
+    if (t.dataset && t.dataset.p) {
+      var ms = S.master.st; if (t.dataset.p === 'month') { ms.pm = t.value; var bb = window.A2ZMaster.bounds(t.value); ms.pf = bb[0]; ms.pt = bb[1]; } else { ms.pm = 'custom'; ms[t.dataset.p === 'from' ? 'pf' : 'pt'] = t.value; }
+      ms.page = 0; ms.type = ''; guard(masterLoad)(); return;
+    }
     if (t.dataset && t.dataset.m) { S.master.st[t.dataset.m] = t.value; S.master.st.page = 0; masterRes(); return; }
     if (t.classList.contains('cm-sel')) { commShow(t.closest('.commbox')); return; }
+    if (t.name === 'type' && t.form && t.form.dataset.form === 'staff') { t.form.dataset.type = t.value; return; }
     if (t.name === 'model' || t.name === 'commKind') { var fm = t.form; if (fm) { if (t.name === 'model') fm.dataset.model = t.value; rcAuto(fm); } return; }
     if (t.classList.contains('js-days')) {
       guard(async function () { await api('POST', '/api/admin/attendance', { candId: t.dataset.id, month: S.month, days: t.value || 0 }); await load(); P.toast('Din save ho gaye'); })();

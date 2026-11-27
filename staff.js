@@ -10,7 +10,9 @@
   var LINK = /^[0-9a-f]{32}$/.test(HASH);                 // purana seedha link bhi chalta hai
   var TOKEN = LINK ? HASH : tget();
   var S = { month: P.thisMonth(), tab: 'home', view: null, screen: '', f: {}, form: null, hz: null, duty: {}, adv: null, af: {}, hzParty: '', q: '', photos: {}, rq: null, pw: false, msg: '' };
-  var TYPE = { agent: 'Staff', supplier: 'Manpower supplier', supervisor: 'Site supervisor' };
+  var TYPE = { agent: 'Staff', supplier: 'Manpower supplier', supervisor: 'Site supervisor', office: 'Office staff' };
+  var OFFICE_TABS = ['home', 'duty', 'hisaab', 'ids', 'help'];
+  function tabs() { return S.view && S.view.staff && S.view.staff.type === 'office' ? TABS.filter(function (t) { return OFFICE_TABS.indexOf(t[0]) >= 0; }) : TABS; }
   var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['duty', 'Duty (IN / OUT)'], ['hazri', 'Hazri (Daily)'], ['work', 'Daily Kaam'], ['hisaab', 'Mera hisaab'], ['ids', 'ID dekhein'], ['help', 'Madad (Help)']];
 
   function api(method, url, body) { return P.api(method, url, body, { 'x-staff-token': TOKEN }); }
@@ -63,7 +65,8 @@
   function render() {
     if (S.screen !== 'app') return;
     var sx = ($('#hzs') || {}).scrollLeft;
-    $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'cands' && pendingCands() ? ' (' + pendingCands() + ')' : '') + '</button>'; }).join('');
+    if (tabs().every(function (t) { return t[0] !== S.tab; })) S.tab = 'home';
+    $('#tabs').innerHTML = tabs().map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'cands' && pendingCands() ? ' (' + pendingCands() + ')' : '') + '</button>'; }).join('');
     showPage(({ home: homeView, cands: candsView, hazri: hazriView, work: workView, duty: dutyView, hisaab: hisaabView, ids: idsView, help: helpView })[S.tab]());
     if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'staff', { quick: ['s-register', 's-cand-add', 's-hazri', 's-hisaab', 's-profile', 's-search', 's-rate'], hello: 'Staff panel ke saare kaam: login, registration, ID card, candidate admission form, hazri, hisaab. Apna sawal likhein, jaise "admission form kahan se milega?"' });
     if (sx && $('#hzs')) $('#hzs').scrollLeft = sx;
@@ -295,8 +298,8 @@
     dgps: function () { return getGps(); },
     dcancel: function () { S.duty = {}; render(); },
     dconfirm: async function (b) {
-      var d = S.duty; if (!d.photo || !d.pos) return; d.busy = true; render();
-      try { var r = await api('POST', '/api/staff/duty-' + d.mode, { photo: d.photo, lat: d.pos.lat, lng: d.pos.lng, acc: d.pos.acc, month: S.month }); S.view = r.view; var was = d.mode; S.duty = {}; render(); pingSync(); P.toast(was === 'in' ? '\u2713 IN ho gaya. Duty shuru.' : '\u2713 OUT ho gaya. Aaj ki attendance lag gayi.'); }
+      var d = S.duty; if (!d.photo || d.gps) return; d.busy = true; render();
+      try { var r = await api('POST', '/api/staff/duty-' + d.mode, Object.assign({ photo: d.photo, month: S.month }, d.pos ? { lat: d.pos.lat, lng: d.pos.lng, acc: d.pos.acc } : {})); S.view = r.view; var was = d.mode; S.duty = {}; render(); pingSync(); P.toast(was === 'in' ? '\u2713 IN ho gaya. Duty shuru.' : '\u2713 OUT ho gaya. Aaj ki attendance lag gayi.'); }
       catch (x) { d.busy = false; render(); var m = $('#dmsg'); if (m) m.textContent = x.message; }
     },
     docpend: function (b) { P.viewImage(S.f.docs[b.dataset.doc], 'Document'); },

@@ -40,14 +40,31 @@
     return '<div class="card"><h4>Mahine-wise: company bill aur party se mila</h4><div class="scroll"><svg class="mchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Mahine-wise bill aur mila"><line class="mc-ax" x1="0" y1="' + (H - pb) + '" x2="' + W + '" y2="' + (H - pb) + '"/>' + o + '</svg></div><div class="sm"><span class="mc-key mc-kb"></span> Company bill &nbsp; <span class="mc-key mc-kr"></span> Party se mila</div></div>';
   };
 
+  /* ---------- period (mahina / tarikh se tarikh tak) ---------- */
+  M.bounds = function (m) { if (!/^\d{4}-\d{2}$/.test(m || '')) return ['', '']; var y = +m.slice(0, 4), mo = +m.slice(5), last = new Date(y, mo, 0).getDate(); return [m + '-01', m + '-' + (last < 10 ? '0' : '') + last]; };
+  M.label = function (d) {
+    var r = d.range || {}; if (!r.from && !r.to) return 'Shuru se aaj tak';
+    var f = function (x) { return x ? (P.dd ? P.dd(x) : x) : '...'; }; return f(r.from) + ' se ' + f(r.to) + ' tak';
+  };
+  M.bar = function (d, st) {
+    var pm = st.pm == null ? '' : st.pm, opts = '<option value=""' + (pm === '' ? ' selected' : '') + '>Sab mahine (shuru se aaj tak)</option>' +
+      (pm === 'custom' ? '<option value="custom" selected>Apni tarikh</option>' : '') +
+      (d.allMonths || []).slice().reverse().map(function (m) { return '<option value="' + m + '"' + (pm === m ? ' selected' : '') + '>' + esc(P.monthName ? P.monthName(m) : m) + '</option>'; }).join('');
+    if (pm && pm !== 'custom' && (d.allMonths || []).indexOf(pm) < 0) opts += '<option value="' + esc(pm) + '" selected>' + esc(P.monthName ? P.monthName(pm) : pm) + ' (koi entry nahi)</option>';
+    var r = d.range || {};
+    return '<div class="card"><div class="grid"><label>Mahina chunein<select id="mper" data-p="month">' + opts + '</select></label><label>Tarikh se<input type="date" data-p="from" value="' + esc(r.from || '') + '"></label><label>Tarikh tak<input type="date" data-p="to" value="' + esc(r.to || '') + '"></label></div>' +
+      '<div class="xs mu">Dekh rahe hain: <b>' + esc(M.label(d)) + '</b>. Receipt, payment, advance, Daily Kaam, duty aur sab entries chuni tarikh ke hisaab se aati hain; "Mahine-wise hisaab" aur uske upar ke bill / margin / commission poore mahine ke hote hain jo is tarikh se chhoo rahe hain.</div></div>';
+  };
+
   /* ---------- poora screen ---------- */
   M.html = function (d, st) {
     var T = d.totals, Mo = d.money, C = d.counts;
     var kp = function (l, v, n) { return '<div class="card"><span class="lbl">' + l + '</span><span class="kpi">' + v + '</span>' + (n ? '<span class="xs mu">' + n + '</span>' : '') + '</div>'; };
     var counts = {}; d.entries.forEach(function (e) { counts[e.t] = (counts[e.t] || 0) + 1; });
     var h = '<div class="row between"><h2>Poora Dashboard</h2><div class="row"><button class="btn sec" data-act="mrefresh">Taza karein</button><button class="btn sec" data-act="xmaster">Excel (sab)</button></div></div>';
-    h += '<div class="note">Shuru se aaj tak ka sab kuch ek jagah: ' + C.months + ' mahine ka hisaab aur ' + d.totalEntries + ' entry' + (d.capped ? ' (sabse nayi ' + d.entries.length + ' dikha rahe, poori ke liye Excel / mahine ka tab dekhein)' : '') + '. Ye sirf dekhne ke liye hai; badalne ke liye us entry wale tab me jayein.</div>';
-    h += '<h3>Kul jod (shuru se aaj tak)</h3><div class="cards">' +
+    h += M.bar(d, st);
+    h += '<div class="note">Dikha rahe hain (' + esc(M.label(d)) + '): sab kuch ek jagah: ' + C.months + ' mahine ka hisaab aur ' + d.totalEntries + ' entry' + (d.capped ? ' (sabse nayi ' + d.entries.length + ' dikha rahe, poori ke liye Excel / mahine ka tab dekhein)' : '') + '. Ye sirf dekhne ke liye hai; badalne ke liye us entry wale tab me jayein.</div>';
+    h += '<h3>Kul jod (' + esc(M.label(d)) + ')</h3><div class="cards">' +
       kp('Company ka kul bill', inr(T.bill), 'party ko jo bill bana') + kp('Labour ki kul payment', inr(T.pay), 'hazri ke hisaab se') + kp('Margin (bill - payment)', inr(T.margin)) + kp('Staff ko commission', inr(T.commission)) +
       kp('Owners ka munafa', inr(T.profit), 'kharch ke baad') + kp('Party se mila', inr(Mo.receiptsAll)) + kp('Party se baaki', inr(T.due), 'mahine-wise baaki ka jod') + kp('Labour ko chukaya', inr(Mo.paidCand)) +
       kp('Staff ko chukaya', inr(Mo.paidStaff)) + kp('Advance diya', inr(Mo.advCand + Mo.advStaff), 'labour ' + inr(Mo.advCand) + ' · staff ' + inr(Mo.advStaff)) + kp('Daily Kaam ki keemat', inr(Mo.workValue), 'labour kharch ' + inr(Mo.workCost) + ' · munafa ' + inr(Mo.workProfit)) + kp('Kul hazri (din)', String(T.days)) + '</div>';
@@ -57,9 +74,9 @@
     h += '<h3>Mahine-wise hisaab</h3><div class="card scroll"><table><thead><tr><th>Mahina</th><th class="n">Hazri (din)</th><th class="n">Company bill</th><th class="n">Labour payment</th><th class="n">Margin</th><th class="n">Staff commission</th><th class="n">Kharch + fixed</th><th class="n">Owners ka munafa</th><th class="n">Milna chahiye</th><th class="n">Mil chuka</th><th class="n">Baaki</th><th class="n">Daily Kaam</th></tr></thead><tbody>' +
       (d.months.length ? d.months.slice().reverse().map(function (r) { return '<tr><td>' + esc(P.monthName ? P.monthName(r.m) : r.m) + '</td><td class="n">' + r.days + '</td><td class="n">' + inr(r.bill) + '</td><td class="n">' + inr(r.pay) + '</td><td class="n">' + inr(r.margin) + '</td><td class="n">' + inr(r.commission) + '</td><td class="n">' + inr(r.expenses) + '</td><td class="n">' + inr(r.profit) + '</td><td class="n">' + inr(r.receivable) + '</td><td class="n">' + inr(r.received) + '</td><td class="n">' + inr(r.due) + '</td><td class="n">' + inr(r.workValue) + '</td></tr>'; }).join('') : '<tr><td colspan="12" class="mu">Abhi koi mahine ka hisaab nahi.</td></tr>') +
       '</tbody></table></div>';
-    h += '<h3>Sab entry (shuru se aaj tak)</h3><div class="card"><div class="row mchips">' + '<button class="chip' + (st.type ? '' : ' on') + '" data-act="mtype" data-id="">Sab (' + d.entries.length + ')</button>' +
+    h += '<h3>Sab entry (' + esc(M.label(d)) + ')</h3><div class="card"><div class="row mchips">' + '<button class="chip' + (st.type ? '' : ' on') + '" data-act="mtype" data-id="">Sab (' + d.entries.length + ')</button>' +
       TYPES.filter(function (t) { return counts[t[0]]; }).map(function (t) { return '<button class="chip' + (st.type === t[0] ? ' on' : '') + '" data-act="mtype" data-id="' + t[0] + '">' + t[1] + ' (' + counts[t[0]] + ')</button>'; }).join('') + '</div>' +
-      '<div class="grid"><label>Khojein (naam, party, rakam, kuch bhi)<input id="mq" type="search" autocomplete="off" value="' + esc(st.q || '') + '" placeholder="jaise: Ram advance"></label><label>Tarikh se<input type="date" data-m="from" value="' + esc(st.from || '') + '"></label><label>Tarikh tak<input type="date" data-m="to" value="' + esc(st.to || '') + '"></label></div></div>' +
+      '<div class="grid"><label>Khojein (naam, party, rakam, kuch bhi)<input id="mq" type="search" autocomplete="off" value="' + esc(st.q || '') + '" placeholder="jaise: Ram advance"></label></div></div>' +
       '<div id="mres">' + M.results(d, st) + '</div>';
     return h;
   };
@@ -72,9 +89,9 @@
     d.months.forEach(function (r) { mo.push([r.m, r.days, r.bill, r.pay, r.margin, r.commission, r.expenses, r.profit, r.receivable, r.received, r.due, r.workValue]); });
     var T = d.totals, Mo = d.money, kj = [['Vivaran', 'Rakam']];
     [['Company ka kul bill', T.bill], ['Labour ki kul payment', T.pay], ['Margin', T.margin], ['Staff ko commission', T.commission], ['Owners ka munafa', T.profit], ['Party se mila', Mo.receiptsAll], ['Party se baaki', T.due], ['Labour ko chukaya', Mo.paidCand], ['Staff ko chukaya', Mo.paidStaff], ['Advance (labour)', Mo.advCand], ['Advance (staff)', Mo.advStaff], ['Daily Kaam ki keemat', Mo.workValue], ['Daily Kaam: labour kharch', Mo.workCost], ['Daily Kaam: munafa', Mo.workProfit]].forEach(function (x) { kj.push(x); });
-    return [{ name: 'Kul jod', rows: kj, widths: [34, 18], title: 'Overall Business Summary (Since Start)', totalHeaders: [] },
+    return [{ name: 'Kul jod', rows: kj, widths: [34, 18], title: 'Business Summary (' + M.label(d) + ')', totalHeaders: [] },
       { name: 'Mahine-wise', rows: mo, widths: [12, 12, 16, 16, 14, 16, 16, 18, 16, 14, 14, 14], title: 'Month-wise Business Summary' },
-      { name: 'Sab entries', rows: ent, widths: [12, 16, 56, 22, 18, 16, 40], title: 'All Entries Register (Since Start)', totalHeaders: [] }];
+      { name: 'Sab entries', rows: ent, widths: [12, 16, 56, 22, 18, 16, 40], title: 'All Entries Register (' + M.label(d) + ')', totalHeaders: [] }];
   };
   window.A2ZMaster = M;
 })();

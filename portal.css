@@ -171,3 +171,6 @@ form[data-model="measure"] .c-bill,form[data-model=""] .c-comm,form[data-model="
 form[data-model="labour"] .m-work{display:none}
 .mchart{width:100%;min-width:520px;height:auto}.mc-b{fill:var(--ac,#1f4f8f)}.mc-r{fill:var(--ok,#1c7c4d)}.mc-t{font-size:9px;fill:var(--mu,#666)}.mc-ax{stroke:var(--ln,#ccc);stroke-width:1}.mc-key{display:inline-block;width:10px;height:10px;vertical-align:middle}.mc-kb{background:var(--ac,#1f4f8f)}.mc-kr{background:var(--ok,#1c7c4d)}.mchips{flex-wrap:wrap}.chip.on{background:var(--ac,#1f4f8f);color:#fff}
 #mres{min-width:0;max-width:100%;overflow-x:auto}
+
+form[data-type="office"] .m-nonoffice{display:none}
+form:not([data-type="office"]) .m-office{display:none}

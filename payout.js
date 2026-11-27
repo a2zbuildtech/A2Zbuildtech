@@ -97,7 +97,7 @@
     var warnings = [], lines = [], modeWarned = {}, commToWarned = {}, modelWarned = {};
     /* kaam ka tarika: party.model = 'labour' (labour supply, payment party tay karti hai, hume commission) | 'measure' (naap / wazan / length ka kaam:
        labour ki payment hum tay karte hain, party ko bill kaam ki keemat (Daily Kaam) se banta hai) | '' (tay nahi = purana tarika: hazri x rate). */
-    var workValue = inp.workValue || {}, alloc = {};
+    var workValue = inp.workValue || {}, dutyDays = inp.dutyDays || {}, alloc = {};
     parties.forEach(function (p) {
       if (p.model !== 'measure') return;
       var wv = r2(nn(workValue[p.id], 0)), mine = cands.filter(function (c) { return c.partyId === p.id; }).map(function (c) { var r = att[c.id] && att[c.id][month]; return { id: c.id, days: r ? nn(r.days, 0) : 0 }; }).filter(function (x) { return x.days > 0; });
@@ -117,14 +117,16 @@
       var days = rec ? nn(rec.days, 0) : 0;
       var basis = S.perDay ? 1 : (has(party.basisDays) && nn(party.basisDays) > 0 ? nn(party.basisDays) : S.basisDays);   // perDay=1: rate seedha rupaye/din
       var f = days / basis;
-      var bill = measure ? nn(alloc[c.id], 0) : r2(billRate * f), pay = r2(payRate * f), margin = r2(bill - pay);
+      var partyPaid = party.model === 'labour' && party.labourPaidBy === 'party';   // party seedha labour ko payment deti hai; company ka bill sirf commission
+      var bill = measure ? nn(alloc[c.id], 0) : r2(billRate * f), partyWage = r2(payRate * f), pay = partyPaid ? 0 : partyWage, margin = r2(bill - pay);
       if (measure && f > 0) billRate = r2(bill / f);
       var billPct = has(party.billPct) ? Math.min(nn(party.billPct), 100) : (party.model ? 0 : S.billPct);
       var bonus = r2(bill * billPct / 100), pool = r2(margin + bonus);
       var mode = st ? modeOf(st) : 'direct', pct = 0, fixedRate = null, comm = 0;
       /* party-wise commission: party.commTo = [staff id...] (admin ne chuna). Jo staff list me nahi, use is party se commission nahi jata. commTo tay nahi (purani party) = pehle jaisa, par chetavani. */
-      var restricted = Array.isArray(party.commTo), blocked = !!(st && restricted && party.commTo.indexOf(st.id) < 0);
-      if (st && !restricted && !commToWarned[party.id]) { commToWarned[party.id] = 1; warnings.push({ kind: 'commto', id: party.id, msg: party.name + ': is party ka commission kis staff ko jaye ye tay nahi hai (abhi sabko ja raha hai)' }); }
+      /* STRICT: admin ne jab tak nahi chuna (commTo tay nahi), kisi staff ko commission nahi jata. */
+      var restricted = Array.isArray(party.commTo), blocked = !!(st && !(restricted && party.commTo.indexOf(st.id) >= 0));
+      if (st && !restricted && !commToWarned[party.id]) { commToWarned[party.id] = 1; warnings.push({ kind: 'commto', id: party.id, msg: party.name + ': is party ka commission kis staff ko jaye ye admin ne tay nahi kiya, isliye abhi kisi staff ko commission nahi ja raha' }); }
       if (blocked) { /* commission nahi: poora pool firm ka */ }
       else if (mode === 'percent') { pct = has(st.commissionPct) ? Math.min(nn(st.commissionPct), 100) : S.commissionPct; comm = r2(Math.max(pool, 0) * pct / 100); }
       else if (mode === 'fixed') {
@@ -132,18 +134,19 @@
         comm = fixedRate == null ? 0 : r2(fixedRate * f);
         if (days > 0 && fixedRate == null) warnings.push({ kind: 'fixedrate', id: c.id, msg: st.name + ': "' + c.trade + '" ka fixed rate tay nahi hai (' + c.name + ')' });
         if (days > 0 && comm > Math.max(pool, 0) + 0.004) warnings.push({ kind: 'commhigh', id: c.id, msg: c.name + ': fixed commission pool se zyada hai (firm ko ghata)' });
-      } else if (mode === '' && st && !modeWarned[st.id]) { modeWarned[st.id] = 1; warnings.push({ kind: 'commmode', id: st.id, msg: st.name + ': commission ka option (percent / fixed / koi nahi) abhi chuna nahi gaya, isliye commission 0 hai' }); }
+      }
+      if (mode === '' && st && !modeWarned[st.id]) { modeWarned[st.id] = 1; warnings.push({ kind: 'commmode', id: st.id, msg: st.name + ': commission ka option (percent / fixed / koi nahi) abhi chuna nahi gaya, isliye commission 0 hai' }); }
       var gst = r2(comm * S.gstPct / 100), net = r2(comm - gst);
       if (!party.model && !modelWarned[party.id]) { modelWarned[party.id] = 1; warnings.push({ kind: 'model', id: party.id, msg: party.name + ': ye party kis tarah kaam deti hai (labour + commission / naap ka kaam) ye tay nahi hai' }); }
       if (party.model === 'labour' && has(c.payRate) && card && has(card.pay) && Math.abs(nn(c.payRate) - nn(card.pay)) > 0.004) warnings.push({ kind: 'partypay', id: c.id, msg: c.name + ': party ne ' + card.trade + ' ki payment ' + nn(card.pay) + ' tay ki hai, par candidate me ' + nn(c.payRate) + ' likha hai' });
       if (days > 0 && !card && !(measure ? has(c.payRate) : (has(c.billRate) && has(c.payRate)))) warnings.push({ kind: 'rate', id: c.id, msg: c.name + ' (' + c.trade + ', ' + party.name + '): rate card me rate nahi hai' });
       if (days > 31) warnings.push({ kind: 'days', id: c.id, msg: c.name + ': ' + days + ' din, 31 se zyada' });
-      if (days > 0 && !measure && payRate > billRate) warnings.push({ kind: 'loss', id: c.id, msg: c.name + ': wage company rate se zyada hai' });
+      if (days > 0 && !measure && !partyPaid && payRate > billRate) warnings.push({ kind: 'loss', id: c.id, msg: c.name + ': wage company rate se zyada hai' });
       lines.push({
         id: c.id, name: c.name, trade: c.trade, partyId: c.partyId, partyName: party.name, staffId: c.staffId || null,
         staffName: st ? st.name : '', active: active, days: days, basis: basis, billRate: billRate, payRate: payRate,
         bill: bill, pay: pay, margin: margin, billPct: billPct, bonus: bonus, pool: pool,
-        model: party.model || '', commMode: mode, fixedRate: fixedRate, pct: pct, commission: comm, gst: gst, net: net, commBlocked: blocked
+        model: party.model || '', partyPaid: partyPaid, partyWage: partyPaid ? partyWage : 0, commMode: mode, fixedRate: fixedRate, pct: pct, commission: comm, gst: gst, net: net, commBlocked: blocked
       });
     });
 
@@ -188,7 +191,8 @@
     /* ---- by staff ---- */
     var byStaff = staff.map(function (s) {
       var sl = lines.filter(function (l) { return l.staffId === s.id; });
-      var fixed = fixedPayFor(s, month);
+      var fixedFull = fixedPayFor(s, month), dutyBased = s.payBasis === 'duty', dd = dutyDays[s.id] || 0, perDay = S.basisDays > 0 ? r2(fixedFull / S.basisDays) : 0;
+      var fixed = dutyBased ? r2(Math.min(fixedFull, perDay * dd)) : fixedFull;
       return {
         id: s.id, name: s.name, type: s.type || 'agent',
         commMode: modeOf(s), pct: modeOf(s) === 'percent' ? (has(s.commissionPct) ? Math.min(nn(s.commissionPct), 100) : S.commissionPct) : 0,
@@ -199,7 +203,7 @@
         margin: sum(sl, function (l) { return l.margin; }), bonus: sum(sl, function (l) { return l.bonus; }),
         pool: sum(sl, function (l) { return l.pool; }),
         commission: sum(sl, function (l) { return l.commission; }), gst: sum(sl, function (l) { return l.gst; }),
-        net: sum(sl, function (l) { return l.net; }), fixed: fixed
+        net: sum(sl, function (l) { return l.net; }), fixed: fixed, fixedFull: fixedFull, fixedBasis: dutyBased ? 'duty' : 'full', dutyDays: dutyBased ? dd : null, perDay: dutyBased ? perDay : null
       };
     });
 
