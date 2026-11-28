@@ -82,8 +82,10 @@
   function mount(root, aud, o) {
     o = o || {}; root.textContent = '';
     var wrap = el('div', 'hlp'), log = el('div', 'hlp-log'), chips = el('div', 'hlp-chips'), form = el('form', 'hlp-form'), inp = el('input'), btn = el('button', '', 'Poochhein');
-    log.setAttribute('aria-live', 'polite'); inp.type = 'text'; inp.maxLength = 200; inp.placeholder = 'Apna sawal likhein, jaise: admission form kahan se milega?'; inp.setAttribute('aria-label', 'Apna sawal'); btn.type = 'submit';
+    log.setAttribute('aria-live', 'polite'); inp.type = 'text'; inp.maxLength = o.ai ? 400 : 200; inp.placeholder = 'Apna sawal likhein, jaise: admission form kahan se milega?'; inp.setAttribute('aria-label', 'Apna sawal'); btn.type = 'submit';
     form.appendChild(inp); form.appendChild(btn);
+    var aiBtn = null, hist = [], aiBusy = false;
+    if (o.ai) { aiBtn = el('button', 'hlp-ai', 'AI se poochhein'); aiBtn.type = 'button'; aiBtn.title = 'A2Z Sahayak (AI) website ko padhkar jawab deta hai'; form.appendChild(aiBtn); }
     var mine = KB.filter(function (e) { return !e.a || e.a.indexOf(aud) >= 0; });
     function say(node) { log.appendChild(node); log.scrollTop = log.scrollHeight; }
     function suggest(list, label) {
@@ -119,8 +121,27 @@
         say(d); suggest(near.length ? near : mine.slice(0, 5), near.length ? 'Shayad ye kaam aaye:' : 'Aam sawal:');
       }
     }
+    function snippets(text) {
+      return find(text, aud, 5).map(function (h) { var e = h.e; return { t: e.title, x: [e.intro || '', (e.steps || []).map(function (x, i) { return (i + 1) + '. ' + x; }).join(' '), e.tip ? 'Dhyan: ' + e.tip : ''].join(' ').trim().slice(0, 700) }; });
+    }
+    function askAI(text) {
+      text = String(text || '').trim().slice(0, 400); if (!text || !o.ai || aiBusy) return;
+      say(el('div', 'hlp-m me', text));
+      var wait = el('div', 'hlp-m', 'A2Z Sahayak (AI) soch raha hai...'); say(wait); aiBusy = true; aiBtn.disabled = true;
+      o.ai(text, snippets(text), hist.slice(-4)).then(function (r) {
+        var box = el('div', 'hlp-m hlp-aim'); box.appendChild(el('div', 'hlp-where', 'A2Z Sahayak (AI)'));
+        String(r && r.text || '').split(/\n+/).forEach(function (ln) { if (ln.trim()) box.appendChild(el('p', '', ln)); });
+        box.appendChild(el('div', 'hlp-note', 'AI galat ho sakta hai. Zaruri baat ek baar khud jaanch lein.'));
+        wait.replaceWith(box);
+        if (r && r.ai) { hist.push({ r: 'u', c: text }); hist.push({ r: 'a', c: String(r.text || '').slice(0, 500) }); }
+      }, function (e) {
+        var box = el('div', 'hlp-m hlp-lock'); box.appendChild(el('h4', '', 'AI abhi jawab nahi de paya')); box.appendChild(el('p', '', (e && e.message) || 'Thodi der baad dobara try karein.'));
+        wait.replaceWith(box);
+      }).then(function () { aiBusy = false; aiBtn.disabled = false; log.scrollTop = log.scrollHeight; });
+    }
     function related(e) { if (!e.rel) return; var r = e.rel.map(function (id) { return mine.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean); if (r.length) suggest(r, 'Isse jude sawal:'); }
     form.addEventListener('submit', function (ev) { ev.preventDefault(); var v = inp.value; inp.value = ''; ask(v); inp.focus(); });
+    if (aiBtn) aiBtn.addEventListener('click', function () { var v = inp.value; inp.value = ''; askAI(v); inp.focus(); });
 
     var d0 = el('div', 'hlp-m'); d0.appendChild(el('h4', '', 'Namaste! Main A2Z Sahayak hu'));
     d0.appendChild(el('p', '', o.hello || 'Website me jo bhi kaam hote hain, unka step-by-step tareeka main bata sakta hu. Apna sawal likhein ya neeche se chunein.'));
@@ -129,7 +150,7 @@
     qs.forEach(function (e) { var b = el('button', 'hlp-chip', e.title); b.type = 'button'; b.addEventListener('click', function () { ask(e.title, e); }); chips.appendChild(b); });
     var all = el('button', 'hlp-chip', 'Sab topics dekhein'); all.type = 'button'; all.addEventListener('click', function () { ask('sab topics'); }); chips.appendChild(all);
     wrap.appendChild(log); wrap.appendChild(chips); wrap.appendChild(form);
-    wrap.appendChild(el('div', 'hlp-note', 'Ye website ka built-in guide hai (AI service nahi). Gupt cheezein (password, OTP, SETUP_CODE) ye kabhi nahi batata.'));
+    wrap.appendChild(el('div', 'hlp-note', o.ai ? 'Pehle "Poochhein" built-in guide se jawab deta hai. "AI se poochhein" sawal Groq AI ko bhejta hai (sawal ke saath website ka manual). Password, OTP, SETUP_CODE kabhi nahi bheje jate.' : 'Ye website ka built-in guide hai (AI service nahi). Gupt cheezein (password, OTP, SETUP_CODE) ye kabhi nahi batata.'));
     root.appendChild(wrap);
     return { ask: ask };
   }

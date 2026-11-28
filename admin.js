@@ -114,7 +114,7 @@
 
   async function load() {
     S.data = await api('GET', '/api/admin/data?month=' + S.month);
-    S.hz = null; S.hzKeep = null;
+    S.hz = null; S.hzKeep = null; S.ledger = null;
     render();
   }
 
@@ -195,6 +195,13 @@
   }
   V.parties = function () {
     var d = S.data, r = d.report, h = '<div class="row between"><h2>Party / Company</h2><div class="row"><button class="btn sec" data-act="xparties">Excel</button><button class="btn" data-act="panel" data-k="party">+ Nayi party</button></div></div>';
+    if (!S.ledger && !S.ledgerBusy) { S.ledgerBusy = true; api('POST', '/api/admin/party-ledger', {}).then(function (x) { S.ledger = x; S.ledgerBusy = false; if (S.tab === 'parties') render(); }).catch(function () { S.ledgerBusy = false; }); }
+    if (S.ledger && S.ledger.rows.length) {
+      var lt = S.ledger.totals;
+      h += '<div class="card"><div class="row between"><h3>Party ka kul hisaab (shuru se aaj tak)</h3><button class="btn sm sec" data-act="xledger">Excel</button></div><div class="note">Kul bill me se party ka diya hua <b>advance</b> aur <b>payment</b> ghat kar <b>abhi bacha</b> banta hai. Ulta (minus) aaye to wo party ka advance abhi bacha hua hai.</div><div class="scroll"><table><thead><tr><th>Party</th><th class="n">Kul bill</th><th class="n">Advance mila</th><th class="n">Payment mila</th><th class="n">Abhi bacha (baaki)</th></tr></thead><tbody>' +
+        S.ledger.rows.map(function (x) { return '<tr><td>' + esc(x.name) + '</td><td class="n">' + inr(x.bill) + '</td><td class="n">' + inr(x.advances) + '</td><td class="n">' + inr(x.payments) + '</td><td class="n b">' + (x.balance < 0 ? inr(-x.balance) + ' <span class="pill good">party ka advance bacha</span>' : inr(x.balance)) + '</td></tr>'; }).join('') +
+        '</tbody><tfoot><tr><th>Kul</th><th class="n">' + inr(lt.bill) + '</th><th class="n">' + inr(lt.advances) + '</th><th class="n">' + inr(lt.payments) + '</th><th class="n">' + inr(lt.balance) + '</th></tr></tfoot></table></div></div>';
+    } else if (S.ledgerBusy) h += '<div class="note">Party ka kul hisaab nikal raha hoon...</div>';
     if (!r.byParty.length) h += '<p class="mu">Pehle party jodein aur uska rate card bharein (company kitna deti hai, candidate ko kitna dena hai).</p>';
     r.byParty.forEach(function (p) {
       var raw = party(p.id), rem = d.reminders.filter(function (x) { return x.partyId === p.id; })[0];
@@ -204,7 +211,7 @@
         '<div class="cards">' + mini('Company bill', inr(p.bill)) + mini('Company commission', inr(p.bonus)) + mini('Milna chahiye', inr(p.receivable)) + mini('Mil chuka', inr(p.received)) + mini('Baaki', inr(p.due)) + '</div>' +
         modelLine(raw) + commLine(raw) +
         (rem ? '<div class="xs mu">Aakhri reminder: ' + esc(P.dt(rem.at)) + ' (' + esc(rem.channel) + ')</div>' : '') +
-        '<div class="row"><button class="btn sm sec" data-act="open" data-id="' + p.id + '">' + (S.open[p.id] ? 'Candidates chhupayein' : 'Candidates dekhein') + '</button><button class="btn sm sec" data-act="panel" data-k="party" data-id="' + p.id + '">Edit / Rate card</button><button class="btn sm sec" data-act="partyclone" data-id="' + p.id + '">Isi company ka doosra kaam</button><button class="btn sm sec" data-act="panel" data-k="receipt" data-id="' + p.id + '">Payment mila</button><button class="btn sm sec" data-act="panel" data-k="remind" data-id="' + p.id + '">Reminder</button><button class="btn sm sec" data-act="xparty" data-id="' + p.id + '">Excel</button></div>';
+        '<div class="row"><button class="btn sm sec" data-act="open" data-id="' + p.id + '">' + (S.open[p.id] ? 'Candidates chhupayein' : 'Candidates dekhein') + '</button><button class="btn sm sec" data-act="panel" data-k="party" data-id="' + p.id + '">Edit / Rate card</button><button class="btn sm sec" data-act="partyclone" data-id="' + p.id + '">Isi company ka doosra kaam</button><button class="btn sm sec" data-act="panel" data-k="receipt" data-id="' + p.id + '">Payment mila</button><button class="btn sm sec" data-act="panel" data-k="partyadv" data-id="' + p.id + '">Advance mila</button><button class="btn sm sec" data-act="panel" data-k="remind" data-id="' + p.id + '">Reminder</button><button class="btn sm sec" data-act="xparty" data-id="' + p.id + '">Excel</button></div>';
       if (S.open[p.id]) h += partyTable(p.id);
       h += '</div>';
     });
@@ -700,6 +707,10 @@
         '<div class="span-all">' + photoBox(S.pph, 'Candidate ki photo') + '</div>' + P.docSlots(id ? c.docKeys : [], S.pdocs, !!id) + '<label class="consent span-all"><input type="checkbox" id="consentBox"' + (id && c.consentAt ? ' checked disabled' : '') + '> Candidate ki sahmati li gayi (<a href="terms.html" target="_blank" rel="noopener">Terms</a> + photo/document ke istemal ki). ' + (id && c.consentAt ? 'Darj: ' + esc(String(c.consentAt).slice(0, 10)) : '') + '</label>' +
         '<div class="msg" id="msg" role="alert"></div><div class="row"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="closepanel">Band karein</button></div></form>';
     },
+    partyadv: function (id) {
+      var p = party(id), lg = S.ledger && S.ledger.rows.filter(function (x) { return x.id === id; })[0];
+      return '<h3>' + esc(p.name) + ': ADVANCE mila</h3><p class="sm mu">Party ne kaam shuru hone se pehle / bill se pehle jo paisa diya wo yahan likhein. Ye party ke kul bill me se ghat jata hai.' + (lg ? ' Abhi bacha: ' + inr(lg.balance) : '') + '</p><form data-form="partyadv" class="grid"><input type="hidden" name="partyId" value="' + esc(id) + '">' + fld('amount', 'Advance rakam ₹', '', { type: 'number', step: 'any', min: 1, req: 1 }) + fld('date', 'Tarikh', new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10), { type: 'date', req: 1 }) + fld('note', 'Note (UPI / cheque no. / kis kaam ke liye)', '') + '<div class="msg" id="msg" role="alert"></div><div class="row"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="closepanel">Band karein</button></div></form>';
+    },
     receipt: function (id) {
       var p = party(id), rp = S.data.report.byParty.filter(function (x) { return x.id === id; })[0];
       return '<h3>' + esc(p.name) + ': payment mila (' + P.monthName(S.month) + ')</h3><p class="sm mu">Baaki abhi: ' + inr(rp.due) + '</p><form data-form="receipt" class="grid"><input type="hidden" name="partyId" value="' + esc(id) + '">' + fld('amount', 'Rakam ₹', rp.due > 0 ? rp.due : '', { type: 'number', step: 'any', min: 0, req: 1 }) + fld('date', 'Tarikh', new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10), { type: 'date' }) + fld('note', 'Note (UPI / cheque no.)', '') + '<div class="msg" id="msg" role="alert"></div><div class="row"><button class="btn" type="submit">Save</button><button class="btn sec" type="button" data-act="closepanel">Band karein</button></div></form>';
@@ -756,6 +767,7 @@
       if (o.amount > row.left + 0.5) throw new Error('Baaki sirf ' + inr(row.left) + ' hai. Isse zyada nahi chukaya ja sakta.');
       await save('payments', { kind: o.key.slice(0, i), refId: o.key.slice(i + 1), month: S.month, amount: o.amount, date: o.date, mode: o.mode, note: o.note });
     },
+    partyadv: async function (f) { var o = collect(f); await save('receipts', { partyId: o.partyId, month: String(o.date).slice(0, 7), amount: o.amount, date: o.date, note: o.note, kind: 'advance' }); },
     receipt: async function (f) { var o = collect(f); await save('receipts', { partyId: o.partyId, month: S.month, amount: o.amount, date: o.date, note: o.note }); },
     expense: async function (f) { var o = collect(f); await save('expenses', { month: S.month, category: o.category, label: o.label, amount: o.amount }); },
     settings: async function (f) { await api('POST', '/api/admin/settings', { settings: collect(f) }); await load(); P.toast('Settings save ho gayi'); },
@@ -781,7 +793,7 @@
     var pn = S.panel ? '<div class="panel" id="panel">' + PANELS[S.panel.k](S.panel.id) + '</div>' : '';
     var ae = document.activeElement, keep = ae && ae.id === 'fq' ? ae.selectionStart : null;
     $('#app').innerHTML = pn + secBanner() + V[S.tab]();
-    if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'admin', { quick: ['a-setup', 'a-cand-admin', 'a-hazri', 'a-paid', 'a-money', 'a-staff-approve', 'a-excel'], hello: 'Admin ke saare kaam: staff / candidate approve karna, hazri, advance, kise kitna chukaya, owners ka hissa, Excel, backup. Apna sawal likhein ya chunein.' });
+    if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'admin', { ai: function (q, kb, hist) { return api('POST', '/api/admin/ai', { q: q, kb: kb, hist: hist, month: S.month }); }, quick: ['a-setup', 'a-cand-admin', 'a-hazri', 'a-paid', 'a-money', 'a-staff-approve', 'a-excel'], hello: 'Admin ke saare kaam: staff / candidate approve karna, hazri, advance, kise kitna chukaya, owners ka hissa, Excel, backup. Apna sawal likhein ya chunein.' });
     if (S.panel && S.panel.k === 'party') { var pf = $('form[data-form=party]'); if (pf) rcAuto(pf); }
     if (S.panel) { var el = $('#panel'); if (el && S.panel.fresh) { el.scrollIntoView({ block: 'nearest' }); S.panel.fresh = false; } }
     if (S.hzKeep != null) { var hs = $('#hzs'); if (hs) hs.scrollLeft = S.hzKeep; S.hzKeep = null; }
@@ -859,7 +871,7 @@
       .concat(r.owners.map(function (o) { return [o.name + ' (' + o.role + ')', o.amount]; }));
   }
   /* Standard company format: har sheet par company naam, heading, period, total aur signature */
-  var XT = { 'Enquiry': 'Website Enquiry Register', 'Website rates': 'Website Rates List', 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
+  var XT = { 'Party hisaab': 'Party Ledger', 'Advance list': 'Party Advance Entries', 'Enquiry': 'Website Enquiry Register', 'Website rates': 'Website Rates List', 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
     'Company-wise': 'Party-wise Billing Summary', 'Payment kram': 'Payment Sequence Statement', 'Owners ka hissa': 'Owners Profit Share Statement', 'Party-wise hisaab': 'Party-wise Account Statement', 'Staff-wise hisaab': 'Staff-wise Account Statement',
     'Aaya-gaya': 'Cash Inflow & Outflow Statement', 'Chukaya (paid)': 'Payments Made Statement', 'Payment record': 'Payment Register', 'Advance': 'Advance Register', 'Kharch': 'Expense Register', 'Supplier': 'Manpower Supplier Statement',
     'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Daily Kaam': 'Daily Work & Labour Cost Statement', 'Duty': 'Staff Duty (IN / OUT) Register', 'Kul jod': 'Overall Business Summary (Since Start)', 'Mahine-wise': 'Month-wise Business Summary', 'Sab entries': 'All Entries Register (Since Start)', 'Staff-wise': 'Staff-wise Attendance (Duty)', 'Party-wise': 'Party-wise Work & Labour Summary', 'Jagah-wise': 'Site-wise Work & Labour Summary', 'Team-wise': 'Team-wise Work & Labour Summary', 'Din-wise': 'Day-wise Work & Labour Summary', 'Din-wise ginti': 'Day-wise Man-days Summary' };
@@ -888,6 +900,9 @@
     dclosex: function () { S.dstate.close = null; render(); },
     dclosego: async function (b) { var id = S.dstate.close; S.dstate.close = null; await api('POST', '/api/admin/duty-close', { id: id, count: b.dataset.c === '1', month: S.month }); await load(); P.toast('Duty band ho gayi'); },
     ddel: async function (b) { if (!window.confirm('Ye duty entry (selfie ke saath) hamesha ke liye hata dein?')) return; await api('POST', '/api/admin/duty-del', { id: b.dataset.id, month: S.month }); await load(); P.toast('Entry hata di'); },
+    xledger: function () { var L = S.ledger; if (!L) return; var rows = [['Party', 'Kul bill', 'Advance mila', 'Payment mila', 'Abhi bacha (baaki)']]; L.rows.forEach(function (x) { rows.push([x.name, x.bill, x.advances, x.payments, x.balance]); });
+      var ad = [['Party', 'Tarikh', 'Advance rakam', 'Note']]; L.rows.forEach(function (x) { x.advList.forEach(function (a) { ad.push([x.name, a.date ? P.dd(a.date) : '', a.amount, a.note]); }); });
+      xbook([{ name: 'Party hisaab', rows: rows, widths: [28, 16, 16, 16, 20], title: 'Party Ledger (Total Bill - Advance - Payment)', totalHeaders: ['Kul bill', 'Advance mila', 'Payment mila', 'Abhi bacha (baaki)'] }, { name: 'Advance list', rows: ad, widths: [28, 14, 16, 40], title: 'Party Advance Entries', totalHeaders: ['Advance rakam'] }], 'A2Z-party-hisaab'); },
     enqf: function (b) { S.enq = b.dataset.f; render(); },
     enqdel: async function (b) { if (!window.confirm('Ye enquiry hamesha ke liye hata dein?')) return; await api('POST', '/api/admin/enq-del', { id: b.dataset.id }); await load(); P.toast('Enquiry hata di'); },
     pwdone: async function (b) { await api('POST', '/api/admin/pwreset-done', { id: b.dataset.id }); await load(); P.toast('Request band ki'); },

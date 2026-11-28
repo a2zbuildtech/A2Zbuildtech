@@ -60,6 +60,8 @@
     { id: 's-privacy', a: S, cat: 'Surakshit rakhna', title: 'Meri jankari kitni surakshit hai / kaun dekh sakta hai?', kw: ['surakshit', 'safe', 'privacy', 'gopniya', 'koi aur dekh', 'dusre ki jankari', 'data', 'aadhaar', 'security', 'suraksha'],
       steps: ['Aap sirf apni aur apne candidates ki jankari dekh sakte hain; dusre staff ki nahi.', 'Admin sab dekh sakta hai.', 'Password kisi ko na batayein aur kaam ke baad "Logout" (upar daayein) dabayein, khaaskar kisi ka phone / computer use karne par.'] },
     { id: 's-logout', a: S, cat: 'Shuruaat', title: 'Logout kaise karein?', kw: ['logout', 'log out', 'bahar nikalna', 'band karna', 'sign out'],
-      steps: ['Upar daayein kone me "Logout" button dabayein.', 'Aap login page par wapas aa jayenge.'] }
+      steps: ['Upar daayein kone me "Logout" button dabayein.', 'Aap login page par wapas aa jayenge.'] },
+    { id: 's-sahayak-ai', a: S, cat: 'Shuruaat', title: 'A2Z Sahayak (AI) se kaise poochhein?', kw: ['ai', 'sahayak', 'a2z sahayak', 'chatbot', 'ai se poochna', 'madad ai'],
+      where: 'Madad (Help) tab', steps: ['Madad tab kholein, sawal likhein aur "AI se poochhein" dabayein.', 'AI aapke panel ke kaam (hazri, candidate, duty, ID card) ka tareeka batata hai.'], tip: 'AI rakam, rate, commission, password ya party ki jankari nahi deta. Ye sab admin se poochhein.' },
   ]);
 })();

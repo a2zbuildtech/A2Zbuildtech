@@ -68,7 +68,7 @@
     if (tabs().every(function (t) { return t[0] !== S.tab; })) S.tab = 'home';
     $('#tabs').innerHTML = tabs().map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'cands' && pendingCands() ? ' (' + pendingCands() + ')' : '') + '</button>'; }).join('');
     showPage(({ home: homeView, cands: candsView, hazri: hazriView, work: workView, duty: dutyView, hisaab: hisaabView, ids: idsView, help: helpView })[S.tab]());
-    if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'staff', { quick: ['s-register', 's-cand-add', 's-hazri', 's-hisaab', 's-profile', 's-search', 's-rate'], hello: 'Staff panel ke saare kaam: login, registration, ID card, candidate admission form, hazri, hisaab. Apna sawal likhein, jaise "admission form kahan se milega?"' });
+    if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'staff', { ai: function (q, kb, hist) { return api('POST', '/api/staff/ai', { q: q, kb: kb, hist: hist }); }, quick: ['s-register', 's-cand-add', 's-hazri', 's-hisaab', 's-profile', 's-search', 's-rate'], hello: 'Staff panel ke saare kaam: login, registration, ID card, candidate admission form, hazri, hisaab. Apna sawal likhein, jaise "admission form kahan se milega?"' });
     if (sx && $('#hzs')) $('#hzs').scrollLeft = sx;
   }
   /* ---------- Daily Kaam (staff sirf entry karta hai; rate / keemat / munafa ise dikhte hi nahi) ---------- */
