@@ -149,10 +149,10 @@ V.formulas=function(){
 };
 V.terms=function(){
   return '<section>'+head('Our standard terms','शर्तें','What we normally propose when we work with a company. Every point can be changed in the signed agreement.')+
-  '<div class="cards">'+TERMS.map(function(t){return '<div class="card"><h3>'+esc(t[0])+'</h3><p>'+esc(t[1])+'</p></div>'}).join('')+'</div></section>';
+  '<div class="cards">'+TERMS.map(function(t){return '<div class="card"><h3>'+esc(t[0])+'</h3><p>'+esc(t[1])+'</p></div>'}).join('')+'</div></section>'+(window.A2ZAgr?'<section id="agreements">'+head('Agreement forms','एग्रीमेंट फ़ॉर्म','Sample agreements you can download, fill in and sign with us. Final terms are fixed in the signed agreement.')+window.A2ZAgr.html('pub')+'</section>':'');
 };
 V.help=function(){return '<section>'+head('Help','मदद','Website ke baare me kuch bhi poochhein: rate kahan dekhein, quote kaise maangein, calculator kaise chalayein.')+'<div id="helpBox"></div></section>'};
-B.help=function(){if(window.A2ZHelp)window.A2ZHelp.mount($('#helpBox'),'pub',{quick:['p-about','p-manpower','p-calc','p-contact','p-terms'],hello:'A2Z Build Tech ki website ke baare me poochhein: hamare kaam, manpower rate, calculator, quote, sampark.'})};
+B.help=function(){if(window.A2ZHelp)window.A2ZHelp.mount($('#helpBox'),'pub',{ai:function(q,kb,hist){return post('public/ai',{q:q,kb:kb}).catch(function(e){throw new Error(/band|403/i.test(e.message)?'Website par AI abhi band hai. Upar wale "Poochhein" button se built-in guide ka jawab milega, ya hamein Contact se sampark karein.':e.message)})},quick:['p-about','p-manpower','p-calc','p-contact','p-terms'],hello:'A2Z Build Tech ki website ke baare me poochhein: hamare kaam, manpower rate, calculator, quote, sampark.'})};
 V.contact=function(){
   return '<section>'+head('Contact and quote request','संपर्क')+
   '<div class="tb"><div><small>Address</small>Vivek Nagar, Ward No. 19, Maihar, MP – 485771</div><div><small>Phone and email</small>'+contactCell()+'</div></div>'+

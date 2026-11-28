@@ -4,7 +4,7 @@
   'use strict';
   var $ = P.$, $$ = P.$$, esc = P.esc, inr = P.inr, nf = P.nf, api = P.api;
   var S = { enq: 'all', pr: null, data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {}, master: { d: null, st: { pm: P.thisMonth() } } };
-  var TABS = [['dash', 'Overview'], ['master', 'Poora Dashboard'], ['appr', 'Approvals'], ['enq', 'Enquiry'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['prates', 'Website ke rate'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
+  var TABS = [['dash', 'Overview'], ['master', 'Poora Dashboard'], ['appr', 'Approvals'], ['enq', 'Enquiry'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['prates', 'Website ke rate'], ['agr', 'Agreement / Forms'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
   var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor', office: 'Office staff' };
   var WHERE = function (t) { return t === 'office' ? '<span class="pill good">Office staff</span>' : t === 'supplier' ? '<span class="pill">Manpower supplier</span>' : '<span class="pill warn">Site / Jagah ka staff</span>'; };
   var CMODE = { percent: 'Percent (%)', fixed: 'Fixed rate (trade-wise)', none: 'Koi hissa nahi (admin tay karega)' };
@@ -489,6 +489,7 @@
     return h;
   };
   async function secLoad() { S.sec = await api('GET', '/api/admin/sec-data'); if (S.data) S.data.sec = S.sec.counts; render(); }
+  V.agr = function () { return '<h2>Agreement / Forms</h2><div class="note">Company, staff, labour aur gaadi-kiraye ke agreement ke namoone. PDF print karein ya Word me badal kar bharein. Ye files staff panel (aur company ke liye public site ke Terms page) par bhi dikhti hain.</div>' + (window.A2ZAgr ? window.A2ZAgr.html('admin') : ''); };
   V.help = function () { return '<h2>Madad (Help) - A2Z Sahayak</h2><div class="note">Website me jo bhi kaam hote hain (form kahan milega, hazri kaise bharein, paisa kaise chukayein...) uska step-by-step tareeka poochhein. Gupt cheezein (password, OTP, SETUP_CODE) ye kabhi nahi batata.</div><div id="helpBox"></div>'; };
   V.money = function () {
     var d = S.data, r = d.report, m = money(), h = '<div class="row between"><h2>Hisaab: kitna aaya, kitna jana hai (' + P.monthName(S.month) + ')</h2><div class="row"><button class="btn sec" data-act="xall">Sab kuch Excel me</button><button class="btn" data-act="panel" data-k="advance">+ Advance</button></div></div>';

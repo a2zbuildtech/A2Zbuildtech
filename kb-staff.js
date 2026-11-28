@@ -63,5 +63,7 @@
       steps: ['Upar daayein kone me "Logout" button dabayein.', 'Aap login page par wapas aa jayenge.'] },
     { id: 's-sahayak-ai', a: S, cat: 'Shuruaat', title: 'A2Z Sahayak (AI) se kaise poochhein?', kw: ['ai', 'sahayak', 'a2z sahayak', 'chatbot', 'ai se poochna', 'madad ai'],
       where: 'Madad (Help) tab', steps: ['Madad tab kholein, sawal likhein aur "AI se poochhein" dabayein.', 'AI aapke panel ke kaam (hazri, candidate, duty, ID card) ka tareeka batata hai.'], tip: 'AI rakam, rate, commission, password ya party ki jankari nahi deta. Ye sab admin se poochhein.' },
+    { id: 's-agree', a: S, cat: 'Kaam', title: 'Agreement ya labour joining form kahan se print karein?', kw: ['agreement', 'anubandh', 'contract', 'ikrarnama', 'agreement form', 'labour joining', 'joining form', 'commission agreement', 'agreement print'],
+      where: 'Staff panel > "Agreement / Forms" tab', steps: ['"Agreement / Forms" tab kholein.', 'Naye labour ke liye "Labour Joining Form aur Agreement", company ke liye "Manpower Supply Agreement" ki PDF print karein.', 'Bharkar sign / angootha lagwayein aur admin ko dein.'] }
   ]);
 })();

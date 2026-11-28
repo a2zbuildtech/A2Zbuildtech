@@ -13,7 +13,7 @@
   var TYPE = { agent: 'Staff', supplier: 'Manpower supplier', supervisor: 'Site supervisor', office: 'Office staff' };
   var OFFICE_TABS = ['home', 'duty', 'hisaab', 'ids', 'help'];
   function tabs() { return S.view && S.view.staff && S.view.staff.type === 'office' ? TABS.filter(function (t) { return OFFICE_TABS.indexOf(t[0]) >= 0; }) : TABS; }
-  var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['duty', 'Duty (IN / OUT)'], ['hazri', 'Hazri (Daily)'], ['work', 'Daily Kaam'], ['hisaab', 'Mera hisaab'], ['ids', 'ID dekhein'], ['help', 'Madad (Help)']];
+  var TABS = [['home', 'Meri profile / ID'], ['cands', 'Candidates'], ['duty', 'Duty (IN / OUT)'], ['hazri', 'Hazri (Daily)'], ['work', 'Daily Kaam'], ['hisaab', 'Mera hisaab'], ['ids', 'ID dekhein'], ['agr', 'Agreement / Forms'], ['help', 'Madad (Help)']];
 
   function api(method, url, body) { return P.api(method, url, body, { 'x-staff-token': TOKEN }); }
   function unit() { return S.view && S.view.perDay ? '/din' : '/mahina'; }
@@ -67,7 +67,7 @@
     var sx = ($('#hzs') || {}).scrollLeft;
     if (tabs().every(function (t) { return t[0] !== S.tab; })) S.tab = 'home';
     $('#tabs').innerHTML = tabs().map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'cands' && pendingCands() ? ' (' + pendingCands() + ')' : '') + '</button>'; }).join('');
-    showPage(({ home: homeView, cands: candsView, hazri: hazriView, work: workView, duty: dutyView, hisaab: hisaabView, ids: idsView, help: helpView })[S.tab]());
+    showPage(({ home: homeView, cands: candsView, hazri: hazriView, work: workView, duty: dutyView, hisaab: hisaabView, ids: idsView, agr: agrView, help: helpView })[S.tab]());
     if (S.tab === 'help' && window.A2ZHelp) window.A2ZHelp.mount($('#helpBox'), 'staff', { ai: function (q, kb, hist) { return api('POST', '/api/staff/ai', { q: q, kb: kb, hist: hist }); }, quick: ['s-register', 's-cand-add', 's-hazri', 's-hisaab', 's-profile', 's-search', 's-rate'], hello: 'Staff panel ke saare kaam: login, registration, ID card, candidate admission form, hazri, hisaab. Apna sawal likhein, jaise "admission form kahan se milega?"' });
     if (sx && $('#hzs')) $('#hzs').scrollLeft = sx;
   }
@@ -108,6 +108,7 @@
     S.duty.gps = true; S.duty.err = ''; if (S.tab === 'duty') render();
     return window.A2ZDuty.pos(false).then(function (p) { S.duty.pos = p; S.duty.gps = false; S.duty.err = ''; }).catch(function (e) { S.duty.pos = null; S.duty.gps = false; S.duty.err = e.message; }).then(function () { if (S.tab === 'duty') render(); });
   }
+  function agrView() { return '<h2>Agreement / Forms</h2><div class="note">Agreement ke namoone. Candidate / labour ke joining ke liye "Labour Joining Form", company ke liye "Manpower Supply Agreement" print karein.</div>' + (window.A2ZAgr ? window.A2ZAgr.html('staff') : ''); }
   function helpView() { return '<h2>Madad (Help) - A2Z Sahayak</h2><div class="note">Koi bhi kaam samajh na aaye to yahan poochhein; step-by-step bataya jayega.</div><div id="helpBox"></div>'; }
   function pendingCands() { return S.view.candidates.filter(function (c) { return c.approval === 'pending'; }).length; }
   function k(l, v) { return '<div class="card"><span class="lbl">' + esc(l) + '</span><span class="kpi">' + v + '</span></div>'; }

@@ -15,7 +15,7 @@
 .hlp-form{display:flex;gap:8px;align-items:center}
 .hlp-form input{flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--ln);border-radius:8px;background:var(--sf);color:var(--fg)}
 .hlp-form button{font:inherit;font-weight:600;padding:10px 16px;border:0;border-radius:8px;background:var(--ac);color:var(--acf);cursor:pointer}
-.hlp-form button.hlp-ai{background:var(--sf);color:var(--fg);border:1px solid var(--ac)}
+.hlp-form button.hlp-ai{flex:1 1 100%;background:var(--sf);color:var(--fg);border:1px solid var(--ac)}
 .hlp-form button:disabled{opacity:.6;cursor:wait}
 .hlp-form{flex-wrap:wrap}
 .hlp-form input{flex:1 1 180px}

@@ -85,7 +85,7 @@
     log.setAttribute('aria-live', 'polite'); inp.type = 'text'; inp.maxLength = o.ai ? 400 : 200; inp.placeholder = 'Apna sawal likhein, jaise: admission form kahan se milega?'; inp.setAttribute('aria-label', 'Apna sawal'); btn.type = 'submit';
     form.appendChild(inp); form.appendChild(btn);
     var aiBtn = null, hist = [], aiBusy = false;
-    if (o.ai) { aiBtn = el('button', 'hlp-ai', 'AI se poochhein'); aiBtn.type = 'button'; aiBtn.title = 'A2Z Sahayak (AI) website ko padhkar jawab deta hai'; form.appendChild(aiBtn); }
+    if (o.ai) { aiBtn = el('button', 'hlp-ai', 'A2Z Sahayak se poochhein (AI)'); aiBtn.type = 'button'; aiBtn.title = 'A2Z Sahayak (AI) website ko padhkar jawab deta hai'; form.appendChild(aiBtn); }
     var mine = KB.filter(function (e) { return !e.a || e.a.indexOf(aud) >= 0; });
     function say(node) { log.appendChild(node); log.scrollTop = log.scrollHeight; }
     function suggest(list, label) {
@@ -173,6 +173,8 @@
       where: 'Menu me "Terms"', steps: ['"Terms" dabayein.', 'Har card me ek shart likhi hai (rate, payment kitne din me, retention, safety). Ye sab signed agreement me badli ja sakti hain.'] },
     { id: 'p-formulas', a: ['pub', 'staff', 'admin'], cat: 'Sewayein', title: 'Calculator ke formule kahan dekhein?', kw: ['formula', 'sutra', 'factor', 'kaise nikala'],
       where: 'Menu me "Formulas"', steps: ['"Formulas" dabayein.', 'Table me har cheez ka formula aur note hai, taaki aap khud jaanch sakein.'] },
+    { id: 'p-agree', a: ['pub', 'staff', 'admin'], cat: 'Sewayein', title: 'Agreement ke form kahan se milenge?', kw: ['agreement', 'anubandh', 'contract', 'ikrarnama', 'agreement form', 'rent agreement', 'agreement download', 'agreement print'],
+      where: 'Menu me "Terms" ke neeche "Agreement forms"', steps: ['Upar menu me "Terms" dabayein aur neeche "Agreement forms" tak jayein.', 'Company ke saath Manpower Supply Agreement aur Gaadi / Equipment Kiraya Agreement ki PDF kholein ya Word file download karein.', 'Rate aur shartein bharkar hamare saath sign karein.'], tip: 'Ye namoone hain; final shartein signed agreement me hi tay hoti hain.' },
     { id: 'p-theme', a: ['pub', 'staff', 'admin'], cat: 'Website', title: 'Dark / light mode kaise badlein?', kw: ['dark', 'light', 'theme', 'mode', 'andhera', 'rang', 'colour', 'color'],
       steps: ['Public site par upar daayein kone me "◐" button dabayein.', 'Staff / admin page apne phone ya computer ki dark/light setting ke hisaab se apne-aap badal jate hain.'] },
     { id: 'p-app', a: ['pub', 'staff', 'admin'], cat: 'Website', title: 'Mobile me app ki tarah kaise install karein?', kw: ['app', 'apk', 'install', 'mobile app', 'home screen', 'icon', 'bar bar link', 'shortcut', 'add to home screen', 'app banana', 'phone me rakhna', 'download app', 'play store'],
