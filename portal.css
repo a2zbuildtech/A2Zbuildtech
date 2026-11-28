@@ -178,3 +178,6 @@ form[data-model="labour"] .m-work{display:none}
 
 form[data-type="office"] .m-nonoffice{display:none}
 form:not([data-type="office"]) .m-office{display:none}
+
+.btn.bad{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+.note.bad{border-left:3px solid var(--bad)}
