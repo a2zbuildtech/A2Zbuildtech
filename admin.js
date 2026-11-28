@@ -3,8 +3,8 @@
 (function () {
   'use strict';
   var $ = P.$, $$ = P.$$, esc = P.esc, inr = P.inr, nf = P.nf, api = P.api;
-  var S = { data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {}, master: { d: null, st: { pm: P.thisMonth() } } };
-  var TABS = [['dash', 'Overview'], ['master', 'Poora Dashboard'], ['appr', 'Approvals'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
+  var S = { enq: 'all', pr: null, data: null, month: P.thisMonth(), tab: 'dash', panel: null, open: {}, f: { party: '', staff: '', q: '' }, challenge: null, sentTo: '', armed: null, sec: null, hzParty: '', hz: null, pph: '', pdocs: {}, sph: {}, dstate: {}, master: { d: null, st: { pm: P.thisMonth() } } };
+  var TABS = [['dash', 'Overview'], ['master', 'Poora Dashboard'], ['appr', 'Approvals'], ['enq', 'Enquiry'], ['parties', 'Party / Company'], ['staff', 'Staff aur links'], ['cands', 'Candidates'], ['hazri', 'Hazri (Daily)'], ['duty', 'Duty / Location'], ['work', 'Daily Kaam'], ['pay', 'Payouts'], ['sup', 'Supplier (Site-wise)'], ['ids', 'ID dekhein'], ['money', 'Hisaab (aaya/gaya)'], ['owners', 'Owners ka hissa'], ['remind', 'Reminder'], ['set', 'Settings'], ['prates', 'Website ke rate'], ['sec', 'Suraksha (Alert)'], ['help', 'Madad (Help)']];
   var TYPE = { agent: 'Staff (agent)', supplier: 'Manpower supplier', supervisor: 'Site supervisor', office: 'Office staff' };
   var WHERE = function (t) { return t === 'office' ? '<span class="pill good">Office staff</span>' : t === 'supplier' ? '<span class="pill">Manpower supplier</span>' : '<span class="pill warn">Site / Jagah ka staff</span>'; };
   var CMODE = { percent: 'Percent (%)', fixed: 'Fixed rate (trade-wise)', none: 'Koi hissa nahi (admin tay karega)' };
@@ -181,6 +181,10 @@
 
   /* party ka commission kise jata hai */
   function modelLine(p) {
+    var catTag = p.category ? '<div class="xs"><span class="pill">' + (p.category === 'mech' ? 'Mechanical kaam' : 'Civil kaam') + '</span>' + (p.company ? ' Company: <b>' + esc(p.company) + '</b>' : '') + '</div>' : '';
+    return catTag + modelLine2(p);
+  }
+  function modelLine2(p) {
     if (!p.model) return '<div class="note warn xs">Kaam ka tarika tay nahi hai (labour + commission ya naap ka kaam). "Edit / Rate card" me chunein.</div>';
     return '<div class="xs"><span class="pill ' + (p.model === 'labour' ? 'good' : 'warn') + '">' + esc(MODEL_TXT[p.model]) + '</span> ' + (p.model === 'labour' ? (p.labourPaidBy === 'party' ? 'Party seedha labour ko payment deti hai; hume sirf commission milta hai.' : 'Labour ki payment party tay karti hai; company deti hai, hume commission milti hai.') : 'Labour ki payment hum tay karte hain; bill kaam ki keemat (Daily Kaam) se banta hai' + (S.data.workValue && S.data.workValue[p.id] != null ? ': is mahine ' + inr(S.data.workValue[p.id]) : '') + '.') + '</div>';
   }
@@ -200,7 +204,7 @@
         '<div class="cards">' + mini('Company bill', inr(p.bill)) + mini('Company commission', inr(p.bonus)) + mini('Milna chahiye', inr(p.receivable)) + mini('Mil chuka', inr(p.received)) + mini('Baaki', inr(p.due)) + '</div>' +
         modelLine(raw) + commLine(raw) +
         (rem ? '<div class="xs mu">Aakhri reminder: ' + esc(P.dt(rem.at)) + ' (' + esc(rem.channel) + ')</div>' : '') +
-        '<div class="row"><button class="btn sm sec" data-act="open" data-id="' + p.id + '">' + (S.open[p.id] ? 'Candidates chhupayein' : 'Candidates dekhein') + '</button><button class="btn sm sec" data-act="panel" data-k="party" data-id="' + p.id + '">Edit / Rate card</button><button class="btn sm sec" data-act="panel" data-k="receipt" data-id="' + p.id + '">Payment mila</button><button class="btn sm sec" data-act="panel" data-k="remind" data-id="' + p.id + '">Reminder</button><button class="btn sm sec" data-act="xparty" data-id="' + p.id + '">Excel</button></div>';
+        '<div class="row"><button class="btn sm sec" data-act="open" data-id="' + p.id + '">' + (S.open[p.id] ? 'Candidates chhupayein' : 'Candidates dekhein') + '</button><button class="btn sm sec" data-act="panel" data-k="party" data-id="' + p.id + '">Edit / Rate card</button><button class="btn sm sec" data-act="partyclone" data-id="' + p.id + '">Isi company ka doosra kaam</button><button class="btn sm sec" data-act="panel" data-k="receipt" data-id="' + p.id + '">Payment mila</button><button class="btn sm sec" data-act="panel" data-k="remind" data-id="' + p.id + '">Reminder</button><button class="btn sm sec" data-act="xparty" data-id="' + p.id + '">Excel</button></div>';
       if (S.open[p.id]) h += partyTable(p.id);
       h += '</div>';
     });
@@ -293,6 +297,35 @@
     return '<div class="card"><h3>Aaj (' + P.dd(d.today) + ') ki hazri</h3>' + (rows.length ? rows.join(' · ') : '<span class="mu">Aaj ki hazri abhi bhari nahi gayi. "Hazri (Daily)" tab me bharein.</span>') + '</div>';
   }
 
+  /* ---------- Enquiry (website ke form se) ---------- */
+  var ENQ = { new: ['Naya', 'warn'], called: ['Baat hui', ''], done: ['Ho gaya', 'good'], spam: ['Spam', 'bad'] };
+  function newEnq() { return ((S.data && S.data.enquiries) || []).filter(function (q) { return q.status === 'new'; }).length; }
+  V.enq = function () {
+    var all = S.data.enquiries || [], f = S.enq, list = all.filter(function (q) { return f === 'all' || q.status === f; });
+    var h = '<h2>Enquiry (website se)</h2><div class="note">Website ke "Contact" form me jo bhi naam, mobile aur kaam likhta hai wo yahan aata hai. Naya aane par aapko email bhi aati hai. Call karke "Baat hui" / "Ho gaya" chunein aur note likh dein.</div>' +
+      '<div class="row">' + [['all', 'Sab (' + all.length + ')']].concat(Object.keys(ENQ).map(function (k) { return [k, ENQ[k][0] + ' (' + all.filter(function (q) { return q.status === k; }).length + ')']; })).map(function (x) { return '<button class="btn sm ' + (f === x[0] ? '' : 'sec') + '" data-act="enqf" data-f="' + x[0] + '">' + esc(x[1]) + '</button>'; }).join('') + '<button class="btn sm sec" data-act="xenq">Excel</button></div>';
+    if (!list.length) return h + '<div class="note">' + (all.length ? 'Is chunav me koi enquiry nahi.' : 'Abhi koi enquiry nahi aayi.') + '</div>';
+    return h + '<div class="card scroll"><table><thead><tr><th>Kab</th><th>Naam / Mobile</th><th>Kaam aur details</th><th>Halat</th><th>Note</th><th></th></tr></thead><tbody>' + list.map(function (q) {
+      return '<tr><td>' + esc(P.dt(q.createdAt)) + '</td><td><b>' + esc(q.name) + '</b><div class="xs"><a href="tel:' + esc(q.phone) + '">' + esc(q.phone) + '</a> · <a href="' + esc(P.waLink(q.phone, 'Namaste ' + q.name + ', A2Z Build Tech se. Aapki enquiry ke baare me baat karni thi.')) + '" target="_blank" rel="noopener">WhatsApp</a></div></td><td>' + esc(q.work) + '<div class="xs mu">' + esc(q.msg) + '</div></td>' +
+        '<td><select data-enqset="' + esc(q.id) + '">' + Object.keys(ENQ).map(function (k) { return '<option value="' + k + '"' + (q.status === k ? ' selected' : '') + '>' + ENQ[k][0] + '</option>'; }).join('') + '</select></td><td><input data-enqnote="' + esc(q.id) + '" type="text" maxlength="300" value="' + esc(q.note) + '" placeholder="Note"></td><td><button class="btn sm sec" data-act="enqdel" data-id="' + esc(q.id) + '">Hatayein</button></td></tr>';
+    }).join('') + '</tbody></table></div>';
+  };
+
+  /* ---------- Website ke rate (index page ke material aur labour ke rate) ---------- */
+  function prInit() {
+    if (S.pr) return;
+    S.pr = JSON.parse(JSON.stringify(S.data.pubrates || []));
+  }
+  V.prates = function () {
+    prInit();
+    var h = '<h2>Website ke rate</h2><div class="note">Ye wahi rate hain jo public website ke <b>Manpower</b> aur <b>Calculators</b> page par sabko dikhte hain. Yahan badal kar "Save" dabayein, sabhi visitors ko naya rate dikhega (website khulne par). Pehli baar "Website ki list yahan laayein" dabayein.</div>' +
+      '<div class="row"><button class="btn sm" data-act="prseed">Website ki list yahan laayein</button><button class="btn sm sec" data-act="practive" data-k="mat">+ Material</button><button class="btn sm sec" data-act="practive" data-k="labour">+ Labour / trade</button><button class="btn sm sec" data-act="xrates">Excel</button></div>';
+    if (!S.pr.length) return h + '<div class="note warn">Abhi list khali hai. "Website ki list yahan laayein" dabayein; tab tak website apne default rate dikhati hai.</div>';
+    var row = function (r, i) { return '<tr><td><input data-pr="' + i + '" data-k="name" type="text" maxlength="80" value="' + esc(r.name) + '"></td><td><input data-pr="' + i + '" data-k="unit" type="text" maxlength="20" value="' + esc(r.unit || '') + '"' + (r.kind === 'labour' ? ' disabled placeholder="per din"' : '') + '></td><td><input data-pr="' + i + '" data-k="rate" type="number" min="0" step="any" value="' + esc(r.rate) + '"></td><td><select data-pr="' + i + '" data-k="div"><option value="civil"' + (r.div !== 'mech' ? ' selected' : '') + '>Civil</option><option value="mech"' + (r.div === 'mech' ? ' selected' : '') + '>Mechanical</option></select></td><td><label class="row"><input type="checkbox" data-pr="' + i + '" data-k="active"' + (r.active === false ? '' : ' checked') + '> Dikhayein</label></td><td><button class="btn sm sec" data-act="prdel" data-i="' + i + '">Hatayein</button></td></tr>'; };
+    var tbl = function (kind, title, unit) { var rows = S.pr.map(function (r, i) { return r.kind === kind ? row(r, i) : ''; }).join(''); return '<h3>' + title + '</h3><div class="card scroll"><table><thead><tr><th>Naam</th><th>Ikai</th><th class="n">Rate (₹ ' + unit + ')</th><th>Kaam</th><th></th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'; };
+    return h + tbl('labour', 'Labour / trade ke rate (per din)', 'per din') + tbl('mat', 'Material ke rate', 'per ikai') + '<div class="row"><button class="btn" data-act="prsave">Save karein (sabko dikhega)</button></div>';
+  };
+
   /* ---------- Approvals ---------- */
   function marksText(mk) { var n = 0, h = 0; String(mk || '').split('').forEach(function (c) { if (c === '1') n++; else if (c === 'h') h++; }); return n + ' poore' + (h ? ' + ' + h + ' aadhe' : '') + ' din'; }
   V.appr = function () {
@@ -314,6 +347,10 @@
     if (a.att.length) {
       h += '<div class="row between"><h3>Hazri approval (' + a.att.length + ')</h3><button class="btn sm" data-act="apattall">Sab approve karein</button></div><div class="note">Staff ki bhari hazri approve hone par hi admin ke hisaab me judti hai. Badlav ho to purana approved hisaab tab tak chalta hai.</div><div class="card scroll"><table><thead><tr><th>Serial</th><th>Naam</th><th>Party</th><th>Staff</th><th>Mahina</th><th class="n">Din (naye)</th><th class="n">Abhi ke approved</th><th>Hazri</th><th></th></tr></thead><tbody>' +
         a.att.map(function (x) { return '<tr><td class="xs">' + esc(x.serial) + '</td><td>' + esc(x.name) + '</td><td>' + esc(x.partyName) + '</td><td>' + esc(x.staffName) + '</td><td>' + P.monthName(x.month) + '</td><td class="n"><b>' + nf(x.days) + '</b></td><td class="n">' + (x.current ? nf(x.current) : '—') + '</td><td class="xs">' + (x.marks ? marksText(x.marks) : 'din bhare') + '</td><td><div class="row"><button class="btn sm" data-act="apatt" data-id="' + x.candId + '" data-m="' + x.month + '">Approve</button><button class="btn sm sec" data-act="rjatt" data-id="' + x.candId + '" data-m="' + x.month + '">Wapas</button></div></td></tr>'; }).join('') + '</tbody></table></div>';
+    }
+    if ((a.pwreset || []).length) {
+      h += '<h3>Password bhoolne ki request (' + a.pwreset.length + ')</h3><div class="note">Staff ne "Password bhool gaye" dabaya hai. Naya password set karke staff ko batayein (phone par). Password set hote hi ye request band ho jati hai.</div><div class="card scroll"><table><thead><tr><th>Staff</th><th>Kab</th><th></th></tr></thead><tbody>' +
+        a.pwreset.map(function (q) { return '<tr><td>' + esc(q.name) + ' <span class="xs mu">' + esc(q.serial) + ' · ' + esc(q.phone) + '</span></td><td>' + esc(P.dt(q.at)) + '</td><td><button class="btn sm" data-act="panel" data-k="staffpw" data-id="' + esc(q.staffId) + '">Naya password set karein</button> <button class="btn sm sec" data-act="pwdone" data-id="' + esc(q.id) + '">Band karein</button></td></tr>'; }).join('') + '</tbody></table></div>';
     }
     if (a.requests.length) {
       h += '<h3>Rate badalne ki request (' + a.requests.length + ')</h3><div class="card scroll"><table><thead><tr><th>Candidate</th><th>Staff</th><th class="n">Abhi ' + unit() + '</th><th class="n">Maanga ' + unit() + '</th><th>Karan</th><th></th></tr></thead><tbody>' +
@@ -609,7 +646,7 @@
       '<div class="row">' + (st.length ? st.map(function (x) { return '<label class="row"><input type="checkbox" class="ct-box" value="' + esc(x.id) + '"' + (set && p.commTo.indexOf(x.id) >= 0 ? ' checked' : '') + '> ' + esc(x.name) + '</label>'; }).join('') : '<span class="mu">Abhi koi staff nahi.</span>') + '</div></div>';
   }
   function partyWorkBox(p) {
-    var works = (S.data.catalog || []).filter(function (x) { return x.kind === 'work' && x.active !== false; });
+    var works = (S.data.catalog || []).filter(function (x) { return x.kind === 'work' && x.active !== false && (!(p.category) || x.category === p.category); });
     if (!works.length) return '<div class="note span-all">Daily Kaam me is party ke kaam ka alag rate likhna ho to pehle "Daily Kaam" tab me kaam ki list bharein.</div>';
     var mine = {}; (p.workRates || []).forEach(function (r) { mine[r.workId] = r.rate; });
     return '<div class="card span-all"><h4>Daily Kaam: is party ke kaam ke rate</h4><div class="note">Khali chhodne par list wala rate lagta hai. Is party ke liye alag rate ho to yahan likhein.</div><div class="scroll"><table><thead><tr><th>Kaam</th><th>List ka rate</th><th>Is party ka rate (₹ per ikai)</th></tr></thead><tbody>' +
@@ -617,8 +654,8 @@
   }
   var PANELS = {
     party: function (id) {
-      var p = id ? party(id) : { name: '', phone: '', contact: '', address: '', gstin: '', billPct: '', basisDays: '', payDays: '', rates: [], active: true };
-      return '<h3>' + (id ? 'Party edit' : 'Nayi party') + '</h3><form data-form="party" class="grid" data-model="' + esc(p.model || '') + '"><input type="hidden" name="id" value="' + esc(id || '') + '">' + fld('name', 'Party / Company ka naam', p.name, { req: 1 }) + fld('contact', 'Contact person', p.contact) + fld('phone', 'Mobile', p.phone, { type: 'tel' }) + fld('email', 'Email (reminder ke liye)', p.email, { type: 'email' }) + fld('gstin', 'GSTIN', p.gstin) + fld('address', 'Pata', p.address) +
+      var p = id ? party(id) : ((S.panel && S.panel.preset) || { name: '', phone: '', contact: '', address: '', gstin: '', billPct: '', basisDays: '', payDays: '', rates: [], active: true });
+      return '<h3>' + (id ? 'Party edit' : 'Nayi party') + '</h3><form data-form="party" class="grid" data-model="' + esc(p.model || '') + '"><input type="hidden" name="id" value="' + esc(id || '') + '">' + fld('name', 'Party / Company ka naam', p.name, { req: 1 }) + fld('contact', 'Contact person', p.contact) + fld('phone', 'Mobile', p.phone, { type: 'tel' }) + fld('email', 'Email (reminder ke liye)', p.email, { type: 'email' }) + fld('gstin', 'GSTIN', p.gstin) + fld('address', 'Pata', p.address) + sel('category', 'Kaam ka prakar (is party ki ye entry kiske liye)', [['', 'Dono / tay nahi'], ['civil', 'Civil kaam'], ['mech', 'Mechanical kaam']], p.category || '') + fld('company', 'Company ka naam (ek hi company ki civil + mechanical entry jodne ke liye)', p.company || '') + '<div class="note span-all">Agar ek hi company hame civil aur mechanical dono kaam de, to <b>dono ke liye alag entry</b> banayein (jaise "Sany Civil" aur "Sany Mechanical"). Har entry ka rate, kaam ka tarika, labour rate aur commission alag rahega. Party card par "Isi company ka doosra kaam" dabane se jankari apne-aap bhar jati hai.</div>' +
         fld('billPct', 'Is party ka commission % (khali = default)', p.billPct, { type: 'number', step: 'any', min: 0, max: 100 }) + fld('basisDays', 'Mahine ke din (sirf mahine-wale rate me)', p.basisDays, { type: 'number', min: 1, max: 31 }) + fld('payDays', 'Payment ke din (khali = default)', p.payDays, { type: 'number', min: 0 }) +
         sel('active', 'Halat', [['true', 'Chalu'], ['false', 'Band']], String(p.active !== false)) +
         modelBox(p) +
@@ -690,7 +727,7 @@
     secsite: async function (f) { var o = collect(f), r = await api('POST', '/api/admin/sec-action', { act: 'baseline', url: o.url }); P.toast(r.msg); await secLoad(); },
     party: async function (f) {
       var o = collect(f), rates = $$('#rateRows tr', f).map(function (tr) { return { trade: $('.r-trade', tr).value, bill: $('.r-bill', tr).value, pay: $('.r-pay', tr).value, comm: $('.r-comm', tr).value }; }).filter(function (r) { return r.trade.trim(); });
-      var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates, model: o.model || '', commKind: o.commKind || 'amt', labourPaidBy: o.model === 'labour' && o.labourPaidBy === 'party' ? 'party' : 'company' };
+      var item = { name: o.name, contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: o.billPct, basisDays: o.basisDays, payDays: o.payDays, active: o.active === 'true', rates: rates, category: o.category || '', company: o.company || '', model: o.model || '', commKind: o.commKind || 'amt', labourPaidBy: o.model === 'labour' && o.labourPaidBy === 'party' ? 'party' : 'company' };
       item.commTo = o.ct_set === 'set' ? $$('.ct-box', f).filter(function (x) { return x.checked; }).map(function (x) { return x.value; }) : null;
       item.workRates = $$('.wr', f).filter(function (x) { return x.value !== ''; }).map(function (x) { return { workId: x.dataset.id, rate: x.value }; });
       if (o.id) item.id = o.id; await save('parties', item);
@@ -739,7 +776,7 @@
   function keepScroll() { var e = $('#hzs'); S.hzKeep = e ? e.scrollLeft : null; }
   function render() {
     shell(true);
-    $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'sec' && S.data.sec && S.data.sec.n ? ' <span class="pill bad">' + S.data.sec.n + '</span>' : '') + (t[0] === 'appr' && S.data.pendingCount ? ' <span class="pill warn">' + S.data.pendingCount + '</span>' : '') + '</button>'; }).join('');
+    $('#tabs').innerHTML = TABS.map(function (t) { return '<button data-act="tab" data-id="' + t[0] + '" aria-current="' + (t[0] === S.tab) + '">' + t[1] + (t[0] === 'sec' && S.data.sec && S.data.sec.n ? ' <span class="pill bad">' + S.data.sec.n + '</span>' : '') + (t[0] === 'enq' && newEnq() ? ' <span class="pill warn">' + newEnq() + '</span>' : '') + (t[0] === 'appr' && S.data.pendingCount ? ' <span class="pill warn">' + S.data.pendingCount + '</span>' : '') + '</button>'; }).join('');
     $('#month').value = S.month;
     var pn = S.panel ? '<div class="panel" id="panel">' + PANELS[S.panel.k](S.panel.id) + '</div>' : '';
     var ae = document.activeElement, keep = ae && ae.id === 'fq' ? ae.selectionStart : null;
@@ -822,7 +859,7 @@
       .concat(r.owners.map(function (o) { return [o.name + ' (' + o.role + ')', o.amount]; }));
   }
   /* Standard company format: har sheet par company naam, heading, period, total aur signature */
-  var XT = { 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
+  var XT = { 'Enquiry': 'Website Enquiry Register', 'Website rates': 'Website Rates List', 'Hazri (roz)': 'Daily Attendance Register', 'Party din-wise ginti': 'Party-wise Man-days Summary', 'Candidate hisaab': 'Candidate-wise Payment Statement', 'Staff payout': 'Staff / Supplier Commission Statement',
     'Company-wise': 'Party-wise Billing Summary', 'Payment kram': 'Payment Sequence Statement', 'Owners ka hissa': 'Owners Profit Share Statement', 'Party-wise hisaab': 'Party-wise Account Statement', 'Staff-wise hisaab': 'Staff-wise Account Statement',
     'Aaya-gaya': 'Cash Inflow & Outflow Statement', 'Chukaya (paid)': 'Payments Made Statement', 'Payment record': 'Payment Register', 'Advance': 'Advance Register', 'Kharch': 'Expense Register', 'Supplier': 'Manpower Supplier Statement',
     'Site-wise': 'Site-wise Deployment Report', 'Candidates': 'Candidates List', 'Party': 'Client Party List', 'Staff': 'Staff List', 'Suraksha alerts': 'Security Alert Report', 'Hazri': 'Daily Attendance Register', 'Daily Kaam': 'Daily Work & Labour Cost Statement', 'Duty': 'Staff Duty (IN / OUT) Register', 'Kul jod': 'Overall Business Summary (Since Start)', 'Mahine-wise': 'Month-wise Business Summary', 'Sab entries': 'All Entries Register (Since Start)', 'Staff-wise': 'Staff-wise Attendance (Duty)', 'Party-wise': 'Party-wise Work & Labour Summary', 'Jagah-wise': 'Site-wise Work & Labour Summary', 'Team-wise': 'Team-wise Work & Labour Summary', 'Din-wise': 'Day-wise Work & Labour Summary', 'Din-wise ginti': 'Day-wise Man-days Summary' };
@@ -851,6 +888,19 @@
     dclosex: function () { S.dstate.close = null; render(); },
     dclosego: async function (b) { var id = S.dstate.close; S.dstate.close = null; await api('POST', '/api/admin/duty-close', { id: id, count: b.dataset.c === '1', month: S.month }); await load(); P.toast('Duty band ho gayi'); },
     ddel: async function (b) { if (!window.confirm('Ye duty entry (selfie ke saath) hamesha ke liye hata dein?')) return; await api('POST', '/api/admin/duty-del', { id: b.dataset.id, month: S.month }); await load(); P.toast('Entry hata di'); },
+    enqf: function (b) { S.enq = b.dataset.f; render(); },
+    enqdel: async function (b) { if (!window.confirm('Ye enquiry hamesha ke liye hata dein?')) return; await api('POST', '/api/admin/enq-del', { id: b.dataset.id }); await load(); P.toast('Enquiry hata di'); },
+    pwdone: async function (b) { await api('POST', '/api/admin/pwreset-done', { id: b.dataset.id }); await load(); P.toast('Request band ki'); },
+    xenq: function () { var rows = [['Tarikh', 'Naam', 'Mobile', 'Kaam', 'Details', 'Halat', 'Note']]; (S.data.enquiries || []).forEach(function (q) { rows.push([P.dd(String(q.createdAt).slice(0, 10)), q.name, q.phone, q.work, q.msg, (ENQ[q.status] || [q.status])[0], q.note]); }); xbook([{ name: 'Enquiry', rows: rows, widths: [14, 24, 14, 30, 50, 12, 30], title: 'Website Enquiries', totalHeaders: [] }], 'A2Z-enquiry'); },
+    practive: function (b) { prInit(); S.pr.push({ id: '', kind: b.dataset.k, name: b.dataset.k === 'labour' ? 'Naya trade' : 'Naya material', unit: b.dataset.k === 'labour' ? '' : 'nos', rate: 0, div: 'civil', active: true }); render(); },
+    prdel: function (b) { prInit(); S.pr.splice(+b.dataset.i, 1); render(); },
+    prseed: function () {
+      prInit(); var D = window.A2ZData; if (!D) { P.toast('Website ki list nahi mili'); return; }
+      if (S.pr.length && !window.confirm('Ye list me jo hai uski jagah website ki original list le aayegi. Aage badhein?')) return;
+      var d = D.defaults(); S.pr = d.labour.map(function (r) { return { id: r.id, kind: 'labour', name: r.name, unit: '', rate: r.rate, div: r.div, active: true }; }).concat(d.mats.map(function (r) { return { id: r.id, kind: 'mat', name: r.name, unit: r.unit, rate: r.rate, div: r.div, active: true }; })); render();
+    },
+    prsave: async function () { prInit(); await api('POST', '/api/admin/pubrates-save', { items: S.pr }); S.pr = null; await load(); P.toast('Rate save ho gaye. Website par naye rate dikhenge.'); },
+    xrates: function () { prInit(); var rows = [['Prakar', 'Naam', 'Ikai', 'Rate', 'Kaam', 'Dikhta hai']]; S.pr.forEach(function (r) { rows.push([r.kind === 'labour' ? 'Labour (per din)' : 'Material', r.name, r.unit, Number(r.rate) || 0, r.div === 'mech' ? 'Mechanical' : 'Civil', r.active === false ? 'Nahi' : 'Haan']); }); xbook([{ name: 'Website rates', rows: rows, widths: [18, 34, 10, 12, 14, 12], title: 'Website Rates', totalHeaders: [] }], 'A2Z-website-rates'); },
     xduty: function () { var d = S.data.duty || { records: [] }; xbook(window.A2ZDuty.sheets(d, S.data.staff, S.month, (S.data.report && S.data.report.byStaff) || []), 'A2Z-duty'); },
     xsup: function () { var L = supData(); if (!L.length) { P.toast('Koi manpower supplier nahi hai'); return; } xbook(supSheets(L), 'A2Z-supplier-hisaab'); },
     xsup1: function (b) { var L = supData().filter(function (x) { return x.s.id === b.dataset.id; }); if (L.length) xbook(supSheets(L), 'A2Z-supplier-' + (L[0].s.serial || 'x')); },
@@ -871,6 +921,10 @@
     xsec: function () {
       var rows = [['Samay (IST)', 'Gambhirta', 'Kya hua', 'Vivaran', 'Kitni baar', 'Halat']].concat(S.sec.alerts.map(function (a) { return [secWhen(a.at), SEVL[a.sev] || a.sev, a.title, a.detail, a.count, a.status === 'new' ? 'dekhna baaki' : 'dekh liya']; }));
       xbook([{ name: 'Suraksha alerts', rows: rows, widths: [20, 14, 46, 60, 10, 14] }], 'A2Z-suraksha');
+    },
+    partyclone: function (b) {
+      var o = party(b.dataset.id); if (!o) return; var to = o.category === 'mech' ? 'civil' : 'mech', base = o.company || String(o.name).replace(/\s*\((Civil|Mechanical)\)\s*$/i, '').replace(/\s+(Civil|Mechanical)$/i, '');
+      S.pph = ''; S.pdocs = {}; S.panel = { k: 'party', id: '', fresh: true, preset: { name: base + (to === 'mech' ? ' Mechanical' : ' Civil'), contact: o.contact, phone: o.phone, email: o.email, gstin: o.gstin, address: o.address, billPct: '', basisDays: '', payDays: o.payDays == null ? '' : o.payDays, rates: [], active: true, category: to, company: base } }; render(); window.scrollTo(0, 0);
     },
     panel: function (b) { S.pph = ''; S.pdocs = {}; S.panel = { k: b.dataset.k, id: b.dataset.id || '', fresh: true }; render(); },
     staffid: async function (b) {
@@ -983,6 +1037,9 @@
     var t = e.target;
     if (t.classList.contains('doc-file') && t.files && t.files[0]) { var dk = t.dataset.doc, df = t.files[0]; t.value = ''; P.photoFromFile(df, { kind: 'doc' }).then(function (u) { S.pdocs[dk] = u; docRefresh(); }, function (x) { if (x.message !== 'cancel') P.toast(x.message); }); return; }
     if (t.id === 'pfile' && t.files && t.files[0]) { P.photoFromFile(t.files[0], { kind: 'photo' }).then(function (u) { S.pph = u; var pb = $('#pbox'); if (pb) pb.innerHTML = '<img alt="photo" src="' + esc(u) + '">'; }, function (x) { P.toast(x.message); }); t.value = ''; return; }
+    if (t.dataset && t.dataset.enqset) { guard(async function () { await api('POST', '/api/admin/enq-set', { id: t.dataset.enqset, status: t.value }); await load(); })(); return; }
+    if (t.dataset && t.dataset.enqnote !== undefined && t.dataset.enqnote !== '') { guard(async function () { var q = (S.data.enquiries || []).filter(function (x) { return x.id === t.dataset.enqnote; })[0]; await api('POST', '/api/admin/enq-set', { id: t.dataset.enqnote, status: q ? q.status : 'new', note: t.value }); P.toast('Note save ho gaya'); })(); return; }
+    if (t.dataset && t.dataset.pr !== undefined && S.pr) { var pi = +t.dataset.pr, pk = t.dataset.k; if (S.pr[pi]) S.pr[pi][pk] = pk === 'active' ? t.checked : t.value; return; }
     if (t.dataset && t.dataset.dset) { guard(async function () { var r = await api('POST', '/api/admin/duty-set', { id: t.dataset.dset, credit: Number(t.value), month: S.month }); await load(); P.toast('Ginti badal di'); })(); return; }
     if (t.dataset && t.dataset.p) {
       var ms = S.master.st; if (t.dataset.p === 'month') { ms.pm = t.value; var bb = window.A2ZMaster.bounds(t.value); ms.pf = bb[0]; ms.pt = bb[1]; } else { ms.pm = 'custom'; ms[t.dataset.p === 'from' ? 'pf' : 'pt'] = t.value; }

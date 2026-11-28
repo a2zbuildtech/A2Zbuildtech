@@ -125,3 +125,5 @@ body.busy{cursor:progress}
 .donebox{text-align:center}.done-tick{width:54px;height:54px;border-radius:50%;background:#16a34a;color:#fff;font-size:34px;line-height:54px;margin:0 auto;animation:a2zpop .35s ease-out}
 @keyframes a2zpop{0%{transform:scale(.3);opacity:0}100%{transform:scale(1);opacity:1}}
 .donetbl{width:100%;text-align:left;border-collapse:collapse;font-size:14px}.donetbl th{border-bottom:0;white-space:normal;width:42%;font-weight:600;opacity:.75;padding:4px 6px;vertical-align:top}.donetbl td{padding:4px 6px;word-break:break-word}.donetbl tr{border-bottom:1px solid #8883}
+
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}

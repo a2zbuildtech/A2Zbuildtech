@@ -3,7 +3,7 @@
  * Network pehle: internet ho to hamesha nayi file leta hai (update ruke nahi). Internet na ho to yaad ki hui file dikhata hai.
  * Google (Apps Script) ke API jawab, photo, hisaab ya koi bhi data kabhi save nahi karta; POST ko chhuta hi nahi. */
 /* VERSION: har baar website update upload karte samay ye number badhaya jata hai. Isi se purane phone/browser ko pata chalta hai ki naya update aaya hai. */
-var VERSION = 'v18';
+var VERSION = 'v19';
 var CACHE = 'a2z-shell-' + VERSION;
 var SHELL = ['index.html', 'staff.html', 'admin.html', 'style.css', 'portal.css', 'help.css', 'hints.js', 'terms.html', 'terms.css', 'data.js', 'calc.js', 'app.js', 'common.js', 'staff.js', 'admin.js', 'payout.js', 'work.js', 'duty.js', 'master.js', 'xlsx-lite.js', 'help.js', 'kb-staff.js', 'kb-admin.js', 'pwa.js', 'logo.svg', 'icon-192.png'];
 self.addEventListener('install', function (e) {

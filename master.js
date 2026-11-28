@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var P = window.P, esc = P.esc, M = {}, PAGE = 100;
-  var TYPES = [['party', 'Party'], ['staff', 'Staff'], ['cand', 'Candidate'], ['hazri', 'Hazri'], ['advance', 'Advance'], ['payment', 'Payment'], ['receipt', 'Party se mila'], ['expense', 'Kharch'], ['work', 'Daily Kaam'], ['duty', 'Duty'], ['request', 'Request'], ['reminder', 'Reminder'], ['log', 'Admin log']];
+  var TYPES = [['party', 'Party'], ['staff', 'Staff'], ['cand', 'Candidate'], ['hazri', 'Hazri'], ['advance', 'Advance'], ['payment', 'Payment'], ['receipt', 'Party se mila'], ['expense', 'Kharch'], ['work', 'Daily Kaam'], ['enquiry', 'Enquiry'], ['duty', 'Duty'], ['request', 'Request'], ['reminder', 'Reminder'], ['log', 'Admin log']];
   var TLAB = {}; TYPES.forEach(function (t) { TLAB[t[0]] = t[1]; });
   var inr = function (n) { return P.inr ? P.inr(n) : '₹' + (Number(n) || 0).toLocaleString('en-IN'); };
 

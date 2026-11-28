@@ -61,7 +61,7 @@
     var sites = c.sites.filter(function (s) { return !f.partyId || s.partyId === f.partyId; }), w = workOf(f, c);
     var h = '<div class="card" id="wform"><h3>' + esc(title) + '</h3><div class="grid">' +
       inp('Tarikh', 'date', { type: 'date', max: c.today, req: 1, hint: 'Jis din kaam hua' }) +
-      '<label>Party *<select data-w="partyId">' + opts(c.parties.map(function (p) { return [p.id, p.name]; }), f.partyId, '— party chuniye —') + '</select></label>' +
+      '<label>Party *<select data-w="partyId">' + opts(c.parties.filter(function (p) { return !p.category || p.category === f.category || p.id === f.partyId; }).map(function (p) { return [p.id, p.name + (p.category ? (p.category === 'mech' ? ' (Mechanical)' : ' (Civil)') : '')]; }), f.partyId, '— party chuniye —') + '</select></label>' +
       inp('Jagah (site) *', 'site', { list: 'wsites', maxlen: 80, hint: 'Party ki kaun si jagah / block par kaam hua. Pehle likhi jagah suggestion me aayegi.' }) +
       inp('Team ka naam *', 'team', { list: 'wteams', maxlen: 60, hint: 'Jaise "Team 1", "Rakesh ki team". Alag-alag team alag likhein.' }) +
       '<label>Kaam ka prakar *<select data-w="category">' + opts([['civil', 'Civil'], ['mech', 'Mechanical']], f.category) + '</select></label>' +
@@ -179,7 +179,7 @@
   document.addEventListener('change', function (e) {
     var t = e.target, d = t.dataset || {};
     if (d.w === 'mode') { setF('mode', t.value); W.refresh(); }
-    else if (d.w === 'category') { setF('category', t.value); setF('workId', ''); W.host.render(); }
+    else if (d.w === 'category') { setF('category', t.value); setF('workId', ''); (function () { var c0 = W.host.ctx(), p0 = c0.parties.filter(function (p) { return p.id === W.st.f.partyId; })[0]; if (p0 && p0.category && p0.category !== t.value) setF('partyId', ''); })(); W.host.render(); }
     else if (d.w === 'partyId' || d.w === 'date' || d.w === 'workId') { setF(d.w, t.value); W.host.render(); fetchPrev(); }
     else if (d.w === 'status' || d.w === 'reprice') { setF(d.w, d.w === 'reprice' ? t.checked : t.value); if (d.w === 'reprice') W.refresh(); }
     else if (d.w === 'site') { setF('site', t.value); fetchPrev(); }

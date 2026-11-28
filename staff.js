@@ -34,7 +34,7 @@
       '<label>Staff ID (jaise A2Z-S-0001) ya mobile number<input id="lid" autocomplete="username" maxlength="40"></label>' +
       '<label>Password<input id="lpw" type="password" autocomplete="current-password" maxlength="100"></label>' +
       '<div class="msg" id="lmsg" role="alert"></div><button class="btn" data-act="login">Login</button>' +
-      '<hr><p class="sm">Pehli baar aaye hain?</p><button class="btn sec" data-act="regform">Naya staff registration</button></div>');
+      '<div class="sm"><button class="link" data-act="forgot">Password bhool gaye?</button></div><hr><p class="sm">Pehli baar aaye hain?</p><button class="btn sec" data-act="regform">Naya staff registration</button></div>');
     $('#lid').focus();
   }
   function regScreen() {
@@ -307,6 +307,14 @@
     docview: async function (b) { var r = await api('POST', '/api/staff/photo', { kind: 'cand', id: S.f.id, doc: b.dataset.doc }); if (r.photo) P.viewImage(r.photo, 'Document'); else P.toast('Document nahi mila'); },
     tab: function (b) { S.tab = b.dataset.id; S.form = null; S.rq = null; render(); },
     regform: function () { S.f = {}; regScreen(); },
+    forgot: async function (b) {
+      var id = $('#lid').value.trim(); $('#lmsg').textContent = '';
+      if (!id) { $('#lmsg').textContent = 'Upar apna Staff ID ya mobile number likhein, phir "Password bhool gaye?" dabayein'; return; }
+      b.disabled = true;
+      try { var r = await P.api('POST', '/api/staff/forgot', { id: id }); $('#lmsg').innerHTML = '<span class="ok">' + esc(r.msg || 'Request chali gayi') + '</span>'; }
+      catch (e) { $('#lmsg').textContent = e.message; }
+      b.disabled = false;
+    },
     backlogin: function () { S.f = {}; loginScreen(); },
     logout: async function () { try { await api('POST', '/api/staff/logout', {}); } catch (e) { /* ignore */ } tset(''); TOKEN = ''; S.view = null; loginScreen(); },
     login: async function (b) {

@@ -9,6 +9,10 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#10161c; --sf:#18212a; --fg:#e8ecef; --mu:#9aa7b2; --ln:#2b3742; --soft:#1e2832;
   --ac:#f0793f; --acf:#1a0d05; --st:#7db4e6; --ok:#5fcf93; --bad:#ff8a80; --warn:#ffd27a; --warnbg:#3a2f12; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#10161c; --sf:#18212a; --fg:#e8ecef; --mu:#9aa7b2; --ln:#2b3742; --soft:#1e2832;
+  --ac:#f0793f; --acf:#1a0d05; --st:#7db4e6; --ok:#5fcf93; --bad:#ff8a80; --warn:#ffd27a; --warnbg:#3a2f12; color-scheme:dark;}
+.themebtn{min-width:40px}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--fb);min-height:100vh}

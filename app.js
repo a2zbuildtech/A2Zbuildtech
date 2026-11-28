@@ -160,15 +160,37 @@ V.contact=function(){
   fld({k:'name',l:'Your name',t:'text',r:1})+fld({k:'phone',l:'Phone',t:'tel',r:1})+
   fld({k:'work',l:'Work needed',o:METHODS.map(function(m){return m.t}).concat(D.METHODS_MECH.map(function(m){return m.t})).concat(['Other'])})+
   '</div><div class="grid">'+fld({k:'msg',l:'Site location and details',t:'area'})+'</div>'+
-  '<div class="row"><button class="btn" type="submit">Prepare request</button></div><div id="quoteOut"></div></form></section>';
+  '<div class="hp" aria-hidden="true"><label>Website<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div><div class="row"><button class="btn" type="submit">Send request</button></div><div id="quoteOut"></div></form></section>';
 };
+/* ---------- server (Apps Script) se baat: enquiry bhejna, rate lena ---------- */
+function apiUrl(){var u=(window.A2Z_CONFIG&&window.A2Z_CONFIG.API_URL)||'';return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)?u:''}
+function post(a,body){var u=apiUrl();if(!u||!window.fetch)return Promise.reject(new Error('no server'));return fetch(u,{method:'POST',cache:'no-store',body:JSON.stringify(Object.assign({a:a},body||{}))}).then(function(r){return r.json()}).then(function(j){if(!j||(j._s&&j._s>=400))throw new Error((j&&j.error)||'server error');return j})}
 FORMS.quote=function(f,fd){
   var q={id:uid(),date:new Date(Date.now()+330*60000).toISOString().slice(0,10),name:fd.get('name'),phone:fd.get('phone'),work:fd.get('work'),msg:fd.get('msg')};
-  DB.enquiries.unshift(q);save();
   var text='Quote request for A2Z Build Tech\nName: '+q.name+'\nPhone: '+q.phone+'\nWork: '+q.work+'\nDetails: '+q.msg;
-  $('#quoteOut').innerHTML='<div class="note">Your request is saved on this device. To send it, copy the text below and share it with us by phone or message.</div><pre class="doc" id="quoteText">'+esc(text)+'</pre><div class="row"><button class="btn sec" type="button" data-act="copy" data-t="#quoteText">Copy request</button></div>';
-  f.reset();
+  var btn=f.querySelector('button[type=submit]');if(btn)btn.disabled=true;
+  post('public/enquiry',{name:q.name,phone:q.phone,work:q.work,msg:q.msg,source:'website',website:fd.get('website')||''}).then(function(){
+    $('#quoteOut').innerHTML='<div class="note ok">Thank you. Your request has reached us. We will call you soon. / धन्यवाद, आपकी request हमें मिल गई है। हम जल्द फ़ोन करेंगे।</div>';f.reset();
+  }).catch(function(e){
+    var bad=e&&/Sahi 10|zaruri|bahut/i.test(e.message||'');
+    if(bad){$('#quoteOut').innerHTML='<div class="note warn">'+esc(e.message)+'</div>';return}
+    DB.enquiries.unshift(q);save();
+    $('#quoteOut').innerHTML='<div class="note">We could not reach the server, so the request is saved on this device only. Please copy the text below and send it to us by phone or WhatsApp.</div><pre class="doc" id="quoteText">'+esc(text)+'</pre><div class="row"><button class="btn sec" type="button" data-act="copy" data-t="#quoteText">Copy request</button></div>';f.reset();
+  }).then(function(){if(btn)btn.disabled=false});
 };
+
+/* admin ke "Website ke rate" tab ke rate sabko dikhte hain: shuru me server se le kar yahan ke rate badal dete hain */
+function syncRates(){
+  post('public/rates').then(function(j){
+    if(!j||!Array.isArray(j.rates)||!j.rates.length)return;
+    j.rates.forEach(function(r){
+      var list=r.kind==='labour'?DB.labour:DB.mats,t=list.filter(function(x){return x.id===r.id})[0];
+      if(t){t.name=r.name;t.rate=+r.rate||0;if(r.kind!=='labour')t.unit=r.unit||t.unit;t.div=r.div||t.div}
+      else list.push(r.kind==='labour'?{id:r.id,name:r.name,rate:+r.rate||0,div:r.div||'civil'}:{id:r.id,name:r.name,unit:r.unit||'nos',rate:+r.rate||0,div:r.div||'civil'});
+    });
+    save();var a=document.activeElement;if(!(a&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)))render();
+  }).catch(function(){});
+}
 
 /* ---------- admin ---------- */
 var AUTH=false,tab='dash',idleT;
@@ -375,4 +397,5 @@ $('#themeBtn').addEventListener('click',function(){
   root.setAttribute('data-theme',dark?'light':'dark');
 });
 render();
+syncRates();
 })();

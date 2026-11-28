@@ -254,4 +254,15 @@
     return trades.length ? trades.map(function (t) { return t.count + ' ' + C.esc(t.trade); }).join(' · ') : '<span class="mu">Abhi koi candidate nahi</span>';
   };
   C.waLink = function (phone, text) { return 'https://wa.me/91' + String(phone || '').replace(/\D/g, '').slice(-10) + '?text=' + encodeURIComponent(text); };
+
+  /* Dark / light mode: yaad rakhta hai (is browser me) */
+  (function () {
+    var KEY = 'a2z_theme', root = document.documentElement;
+    try { var sv = localStorage.getItem(KEY); if (sv === 'dark' || sv === 'light') root.setAttribute('data-theme', sv); } catch (e) {}
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('#themeBtn'); if (!b) return;
+      var cur = root.getAttribute('data-theme'), dark = cur ? cur === 'dark' : !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches), nx = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', nx); try { localStorage.setItem(KEY, nx); } catch (e2) {}
+    });
+  })();
 })();
